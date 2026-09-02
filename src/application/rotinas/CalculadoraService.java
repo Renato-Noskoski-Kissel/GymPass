@@ -1,5 +1,5 @@
 package application.rotinas;
-import domain.financeiro.CalculadoraSoma;
+import dominio.financeiro.CalculadoraSoma;
 
 public class CalculadoraService {
 

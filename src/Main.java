@@ -1,7 +1,7 @@
 import dominio.RegraDeNegocioException;
-import dominio.agenda.Aula;
-import dominio.cadastro.*;
-import dominio.planos.*;
+import dominio.acessoAgenda.Aula;
+import dominio.cadastroRede.*;
+import dominio.planosAdesao.*;
 
 import java.time.Duration;
 import java.time.LocalDate;
