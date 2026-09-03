@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rede de benefício — console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topo">
+  <div class="marca">
+    <span class="marca-simbolo" aria-hidden="true"></span>
+    <span class="marca-nome">Rede de benefício</span>
+  </div>
+  <p class="topo-contexto" id="contexto">Administração da plataforma</p>
+</header>
+
+<div class="quadro">
+
+  <nav class="perfis" aria-label="Perfil de acesso">
+    <p class="perfis-titulo">Entrar como</p>
+    <button class="perfil ativo" data-vista="admin">
+      <span class="perfil-papel">Administração</span>
+      <span class="perfil-tarefa">Parceiros e planos</span>
+    </button>
+    <button class="perfil" data-vista="empresa">
+      <span class="perfil-papel">Empresa</span>
+      <span class="perfil-tarefa">Quadro de beneficiários</span>
+    </button>
+    <button class="perfil" data-vista="estabelecimento">
+      <span class="perfil-papel">Estabelecimento</span>
+      <span class="perfil-tarefa">Modalidades e instrutores</span>
+    </button>
+    <button class="perfil" data-vista="grade">
+      <span class="perfil-papel">Grade de aulas</span>
+      <span class="perfil-tarefa">Turmas e professores</span>
+    </button>
+    <p class="perfis-nota">Conectado ao servidor Java. Os dados vivem enquanto a aplicação estiver rodando.</p>
+  </nav>
+
+  <main class="palco">
+
+    <!-- ============ HU4: administração ============ -->
+    <section class="vista" id="vista-admin">
+      <div class="vista-cabeca">
+        <h1>Parceiros e planos</h1>
+        <p>Homologue estabelecimentos, contrate empresas e defina os níveis de plano da rede.</p>
+      </div>
+
+      <div class="colunas">
+        <article class="bloco">
+          <div class="bloco-cabeca">
+            <h2>Estabelecimentos</h2>
+            <span class="contagem" id="cont-estabelecimentos"></span>
+          </div>
+          <div id="lista-estabelecimentos" class="lista"></div>
+
+          <form class="formulario" id="form-estabelecimento">
+            <div class="campo">
+              <label for="est-nome">Nome</label>
+              <input id="est-nome" required placeholder="Studio Movimento">
+            </div>
+            <div class="par">
+              <div class="campo">
+                <label for="est-tipo">Tipo</label>
+                <select id="est-tipo">
+                  <option value="Academia">Academia</option>
+                  <option value="Estudio" selected>Estúdio</option>
+                  <option value="Quadra">Quadra</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="est-valor">Valor por check-in</label>
+                <input id="est-valor" type="number" min="0" step="0.5" value="12" required>
+              </div>
+            </div>
+            <button class="acao" type="submit">Cadastrar estabelecimento</button>
+          </form>
+        </article>
+
+        <article class="bloco">
+          <div class="bloco-cabeca">
+            <h2>Empresas contratantes</h2>
+            <span class="contagem" id="cont-empresas"></span>
+          </div>
+          <div id="lista-empresas" class="lista"></div>
+
+          <form class="formulario" id="form-empresa">
+            <div class="campo">
+              <label for="emp-nome">Razão social</label>
+              <input id="emp-nome" required placeholder="Tech Ltda">
+            </div>
+            <div class="par">
+              <div class="campo">
+                <label for="emp-dep">Limite de dependentes por funcionário</label>
+                <input id="emp-dep" type="number" min="0" value="2" required>
+              </div>
+              <div class="campo">
+                <label for="emp-venc">Dia de vencimento</label>
+                <input id="emp-venc" type="number" min="1" max="28" value="10" required>
+              </div>
+            </div>
+            <button class="acao" type="submit">Contratar empresa</button>
+          </form>
+        </article>
+      </div>
+
+      <article class="bloco largo">
+        <div class="bloco-cabeca">
+          <h2>Níveis de plano</h2>
+          <span class="contagem" id="cont-planos"></span>
+        </div>
+        <div id="lista-planos" class="planos"></div>
+
+        <form class="formulario linha" id="form-plano">
+          <div class="campo">
+            <label for="plano-nome">Nome</label>
+            <input id="plano-nome" required placeholder="Premium">
+          </div>
+          <div class="campo estreito">
+            <label for="plano-nivel">Nível</label>
+            <input id="plano-nivel" type="number" min="1" max="5" value="1" required>
+          </div>
+          <div class="campo estreito">
+            <label for="plano-valor">Valor mensal</label>
+            <input id="plano-valor" type="number" min="0" step="10" value="89.9" required>
+          </div>
+          <div class="campo estreito">
+            <label for="plano-limite">Aulas por mês</label>
+            <input id="plano-limite" type="number" min="1" value="4" required>
+          </div>
+          <div class="campo checkbox">
+            <label for="plano-dep">
+              <input id="plano-dep" type="checkbox">
+              Permite dependentes
+            </label>
+          </div>
+          <button class="acao" type="submit">Criar plano</button>
+        </form>
+      </article>
+    </section>
+
+    <!-- ============ HU2: empresa ============ -->
+    <section class="vista oculta" id="vista-empresa">
+      <div class="vista-cabeca">
+        <h1>Quadro de beneficiários</h1>
+        <p>Inclua funcionários, conceda o plano e acompanhe quantas pessoas usam o benefício.</p>
+      </div>
+
+      <div class="seletor">
+        <label for="empresa-atual">Empresa</label>
+        <select id="empresa-atual"></select>
+      </div>
+
+      <div class="indicadores" id="indicadores-empresa"></div>
+
+      <article class="bloco largo">
+        <div class="bloco-cabeca">
+          <h2>Funcionários</h2>
+          <span class="contagem" id="cont-funcionarios"></span>
+        </div>
+        <div id="lista-funcionarios" class="lista"></div>
+
+        <form class="formulario linha" id="form-funcionario">
+          <div class="campo">
+            <label for="func-nome">Nome</label>
+            <input id="func-nome" required placeholder="Lara Souza">
+          </div>
+          <div class="campo estreito">
+            <label for="func-matricula">Matrícula</label>
+            <input id="func-matricula" required placeholder="F-001">
+          </div>
+          <div class="campo">
+            <label for="func-plano">Plano concedido</label>
+            <select id="func-plano" required></select>
+          </div>
+          <button class="acao" type="submit">Incluir no quadro</button>
+        </form>
+        <p class="dica">O funcionário entra no quadro já com um plano. Não existe beneficiário sem plano.</p>
+      </article>
+    </section>
+
+    <!-- ============ HU5: estabelecimento ============ -->
+    <section class="vista oculta" id="vista-estabelecimento">
+      <div class="vista-cabeca">
+        <h1>Modalidades e instrutores</h1>
+        <p>Defina o que o seu espaço oferece e quem pode dar aula nele.</p>
+      </div>
+
+      <div class="seletor">
+        <label for="estabelecimento-atual">Estabelecimento</label>
+        <select id="estabelecimento-atual"></select>
+      </div>
+
+      <div class="colunas">
+        <article class="bloco">
+          <div class="bloco-cabeca">
+            <h2>Modalidades</h2>
+            <span class="contagem" id="cont-modalidades"></span>
+          </div>
+          <div id="lista-modalidades" class="lista"></div>
+          <form class="formulario" id="form-modalidade">
+            <div class="campo">
+              <label for="mod-nome">Nome</label>
+              <input id="mod-nome" required placeholder="Pilates">
+            </div>
+            <div class="campo">
+              <label for="mod-desc">Descrição</label>
+              <input id="mod-desc" placeholder="Aulas em grupo com aparelhos">
+            </div>
+            <button class="acao" type="submit">Adicionar modalidade</button>
+          </form>
+        </article>
+
+        <article class="bloco">
+          <div class="bloco-cabeca">
+            <h2>Instrutores</h2>
+            <span class="contagem" id="cont-instrutores"></span>
+          </div>
+          <div id="lista-instrutores" class="lista"></div>
+          <form class="formulario" id="form-instrutor">
+            <div class="campo">
+              <label for="ins-nome">Nome</label>
+              <input id="ins-nome" required placeholder="Ana Reis">
+            </div>
+            <div class="par">
+              <div class="campo">
+                <label for="ins-registro">Registro</label>
+                <input id="ins-registro" required placeholder="CREF-1234">
+              </div>
+              <div class="campo">
+                <label for="ins-esp">Especialidade</label>
+                <input id="ins-esp" placeholder="Pilates">
+              </div>
+            </div>
+            <button class="acao" type="submit">Contratar instrutor</button>
+          </form>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ HU1: grade de aulas ============ -->
+    <section class="vista oculta" id="vista-grade">
+      <div class="vista-cabeca">
+        <h1>Grade de aulas</h1>
+        <p>Monte as turmas, atribua professores e defina quantas pessoas cabem em cada uma.</p>
+      </div>
+
+      <div class="seletor">
+        <label for="grade-estabelecimento">Estabelecimento</label>
+        <select id="grade-estabelecimento"></select>
+      </div>
+
+      <div id="lista-aulas" class="aulas"></div>
+
+      <article class="bloco largo">
+        <div class="bloco-cabeca"><h2>Nova aula</h2></div>
+        <form class="formulario linha" id="form-aula">
+          <div class="campo">
+            <label for="aula-modalidade">Modalidade</label>
+            <select id="aula-modalidade" required></select>
+          </div>
+          <div class="campo">
+            <label for="aula-instrutor">Instrutor</label>
+            <select id="aula-instrutor" required></select>
+          </div>
+          <div class="campo">
+            <label for="aula-inicio">Início</label>
+            <input id="aula-inicio" type="datetime-local" required>
+          </div>
+          <div class="campo estreito">
+            <label for="aula-duracao">Minutos</label>
+            <input id="aula-duracao" type="number" min="15" step="5" value="50" required>
+          </div>
+          <div class="campo estreito">
+            <label for="aula-capacidade">Vagas</label>
+            <input id="aula-capacidade" type="number" min="1" value="10" required>
+          </div>
+          <button class="acao" type="submit">Agendar aula</button>
+        </form>
+      </article>
+    </section>
+
+  </main>
+</div>
+
+<div class="avisos" id="avisos" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
