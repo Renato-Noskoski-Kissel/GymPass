@@ -1,4 +1,4 @@
-package application.grade;
+package application.agendamento;
 
 import dominio.acessoAgenda.Aula;
 import dominio.cadastroRede.Estabelecimento;

@@ -1,4 +1,4 @@
-package application.estabelecimento;
+package application.gestaoDeParceiros;
 
 import dominio.cadastroRede.Estabelecimento;
 import dominio.cadastroRede.Modalidade;

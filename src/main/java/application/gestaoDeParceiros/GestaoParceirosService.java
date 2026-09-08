@@ -1,4 +1,4 @@
-package application.parceiros;
+package application.gestaoDeParceiros;
 
 import dominio.cadastroRede.*;
 import dominio.planosAdesao.Plano;

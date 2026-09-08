@@ -1,4 +1,4 @@
-package application.beneficiarios;
+package application.plano;
 
 import dominio.RegraDeNegocioException;
 import dominio.cadastroRede.Dependente;
