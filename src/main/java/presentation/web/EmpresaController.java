@@ -1,6 +1,6 @@
 package presentation.web;
 
-import application.beneficiarios.BeneficiariosService;
+import application.plano.BeneficiariosService;
 import org.springframework.web.bind.annotation.*;
 
 /** HU2 - gestão do quadro de beneficiários. */

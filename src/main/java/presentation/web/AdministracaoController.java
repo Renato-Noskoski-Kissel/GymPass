@@ -1,6 +1,6 @@
 package presentation.web;
 
-import application.parceiros.GestaoParceirosService;
+import application.gestaoDeParceiros.GestaoParceirosService;
 import org.springframework.web.bind.annotation.*;
 
 /** HU4 - cadastro de parceiros e configuração de planos. */

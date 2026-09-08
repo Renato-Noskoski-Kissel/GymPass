@@ -1,6 +1,6 @@
 package presentation.web;
 
-import application.grade.GradeService;
+import application.agendamento.GradeService;
 import org.springframework.web.bind.annotation.*;
 
 /** HU1 - grade de aulas do estabelecimento. */

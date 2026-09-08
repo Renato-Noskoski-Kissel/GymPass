@@ -1,6 +1,6 @@
 package presentation.web;
 
-import application.estabelecimento.EstabelecimentoService;
+import application.gestaoDeParceiros.EstabelecimentoService;
 import org.springframework.web.bind.annotation.*;
 
 /** HU5 - modalidades e instrutores do estabelecimento. */
