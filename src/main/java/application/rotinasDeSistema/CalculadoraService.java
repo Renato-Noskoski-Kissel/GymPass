@@ -1,4 +1,4 @@
-package application.rotinas;
+package application.rotinasDeSistema;
 import dominio.financeiro.CalculadoraSoma;
 
 public class CalculadoraService {
