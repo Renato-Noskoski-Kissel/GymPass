@@ -250,15 +250,47 @@ function renderEstabelecimento() {
         <button class="acao discreta risco" data-desligar="${i.id}">Desligar</button>
       </div>`).join('')
     : '<p class="vazio">Nenhum instrutor. Sem instrutor não é possível criar aulas.</p>';
-}
 
-/* ---------- HU1: grade de aulas ---------- */
+  preencherSelect($('#recepcao-estabelecimento'), estado.estabelecimentos,
+    e => e.nome, estabelecimentoId);
 
-function renderGrade() {
+  /* passo 4: nome do aluno e situação; a situação vem sempre do estado mais recente */
+  if (conferencia) {
+    const atual = estado.checkIns.find(c => c.codigo === conferencia.codigo);
+    const situacao = atual ? atual.situacao : conferencia.situacao;
+    const [rotulo, classe] = rotuloCheckIn[situacao];
+    $('#recepcao-resultado').innerHTML = `<div class="conferencia">
+        <div class="conferencia-nome">${conferencia.aluno}</div>
+        <div class="item-detalhe">Check-in ${conferencia.quando} · código ${conferencia.codigo}</div>
+        ${selo(rotulo, classe)}
+        ${situacao === 'PENDENTE' ? `<div class="botoes">
+          <button class="acao" data-validar>Liberar entrada</button>
+          <button class="acao discreta risco" data-recusar>Recusar entrada</button>
+        </div>` : ''}
+      </div>`;
+  } else {
+    $('#recepcao-resultado').innerHTML = '';
+  }
+
+  const deHoje = estado.checkIns.filter(c => c.estabelecimentoId === est.id && c.hoje);
+  const pendentes = deHoje.filter(c => c.situacao === 'PENDENTE').length;
+  $('#cont-recepcao').textContent = `${pendentes} aguardando`;
+  $('#lista-recepcao').innerHTML = deHoje.length
+    ? deHoje.slice().reverse().map(c => {
+        const [rotulo, classe] = rotuloCheckIn[c.situacao];
+        return `<div class="item">
+          <div class="item-corpo">
+            <div class="item-nome">${c.aluno}</div>
+            <div class="item-detalhe">${c.quando}${c.motivoRecusa ? ' · ' + c.motivoRecusa : ''}</div>
+          </div>
+          ${selo(rotulo, classe)}
+        </div>`;
+      }).join('')
+    : '<p class="vazio">Nenhum check-in neste estabelecimento hoje.</p>';
+
+  /* HU1: grade de aulas */
   preencherSelect($('#grade-estabelecimento'), estado.estabelecimentos,
     e => e.nome, estabelecimentoId);
-  const est = estabelecimentoAtual();
-  if (!est) return;
 
   preencherSelect($('#aula-modalidade'), est.modalidades, m => m.nome);
   preencherSelect($('#aula-instrutor'), est.instrutores, i => i.nome);
@@ -412,59 +444,20 @@ const rotuloCheckIn = {
   RECUSADO: ['Recusado', 'suspenso']
 };
 
-function renderRecepcao() {
-  preencherSelect($('#recepcao-estabelecimento'), estado.estabelecimentos,
-    e => e.nome, estabelecimentoId);
-  const est = estabelecimentoAtual();
-  if (!est) return;
-
-  /* passo 4: nome do aluno e situação; a situação vem sempre do estado mais recente */
-  if (conferencia) {
-    const atual = estado.checkIns.find(c => c.codigo === conferencia.codigo);
-    const situacao = atual ? atual.situacao : conferencia.situacao;
-    const [rotulo, classe] = rotuloCheckIn[situacao];
-    $('#recepcao-resultado').innerHTML = `<div class="conferencia">
-        <div class="conferencia-nome">${conferencia.aluno}</div>
-        <div class="item-detalhe">Check-in ${conferencia.quando} · código ${conferencia.codigo}</div>
-        ${selo(rotulo, classe)}
-        ${situacao === 'PENDENTE' ? `<div class="botoes">
-          <button class="acao" data-validar>Liberar entrada</button>
-          <button class="acao discreta risco" data-recusar>Recusar entrada</button>
-        </div>` : ''}
-      </div>`;
-  } else {
-    $('#recepcao-resultado').innerHTML = '';
-  }
-
-  const deHoje = estado.checkIns.filter(c => c.estabelecimentoId === est.id && c.hoje);
-  const pendentes = deHoje.filter(c => c.situacao === 'PENDENTE').length;
-  $('#cont-recepcao').textContent = `${pendentes} aguardando`;
-  $('#lista-recepcao').innerHTML = deHoje.length
-    ? deHoje.slice().reverse().map(c => {
-        const [rotulo, classe] = rotuloCheckIn[c.situacao];
-        return `<div class="item">
-          <div class="item-corpo">
-            <div class="item-nome">${c.aluno}</div>
-            <div class="item-detalhe">${c.quando}${c.motivoRecusa ? ' · ' + c.motivoRecusa : ''}</div>
-          </div>
-          ${selo(rotulo, classe)}
-        </div>`;
-      }).join('')
-    : '<p class="vazio">Nenhum check-in neste estabelecimento hoje.</p>';
-}
 
 const vistas = {
   admin: { render: renderAdmin, contexto: 'Administração da plataforma' },
   empresa: { render: renderEmpresa, contexto: 'Visão da empresa contratante' },
   estabelecimento: { render: renderEstabelecimento, contexto: 'Visão do estabelecimento parceiro' },
-  grade: { render: renderGrade, contexto: 'Grade de aulas do estabelecimento' },
   aluno: { render: renderAluno, contexto: 'Visão do aluno' },
-  recepcao: { render: renderRecepcao, contexto: 'Recepção do estabelecimento' }
 };
 
 function render() {
   Object.keys(vistas).forEach(v =>
     $('#vista-' + v).classList.toggle('oculta', v !== vistaAtual));
+  /* grade e recepção agora fazem parte da visão do estabelecimento */
+  ['grade', 'recepcao'].forEach(v =>
+    $('#vista-' + v).classList.toggle('oculta', vistaAtual !== 'estabelecimento'));
   $('#contexto').textContent = vistas[vistaAtual].contexto;
   vistas[vistaAtual].render();
 }
