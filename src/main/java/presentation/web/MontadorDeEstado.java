@@ -25,7 +25,7 @@ public class MontadorDeEstado {
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final DateTimeFormatter LEGIVEL =
-        DateTimeFormatter.ofPattern("EEE dd/MM 'às' HH:mm", new Locale("pt", "BR"));
+            DateTimeFormatter.ofPattern("EEE dd/MM 'às' HH:mm", new Locale("pt", "BR"));
 
     private final Repositorio repositorio;
 
@@ -84,10 +84,11 @@ public class MontadorDeEstado {
 
                 List<DependenteDto> deps = new ArrayList<>();
                 for (Dependente d : f.getDependentes()) {
-                    deps.add(new DependenteDto(d.getNome(), d.getGrauParentesco(), d.ehElegivel()));
+                    deps.add(new DependenteDto(d.getNome(), d.getCpf(), d.getGrauParentesco(),
+                            d.ehElegivel()));
                 }
 
-                funcs.add(new FuncionarioDto(j, f.getNome(), f.getMatricula(),
+                funcs.add(new FuncionarioDto(j, f.getNome(), f.getCpf(), f.getMatricula(),
                         ad == null ? null : ad.getPlano().getNome(),
                         f.ehElegivel(),
                         ad != null && ad.getPlano().permiteDependentes(),

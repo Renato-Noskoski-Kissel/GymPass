@@ -202,14 +202,14 @@ function renderEmpresa() {
   $('#lista-funcionarios').innerHTML = empresa.funcionarios.length
     ? empresa.funcionarios.map(f => {
         const deps = f.dependentes.map(d =>
-          `<div class="item-detalhe">${d.nome} · ${d.grauParentesco}${d.elegivel ? '' : ' (inativo)'}</div>`
+          `<div class="item-detalhe">${d.nome} · ${d.grauParentesco} · CPF ${d.cpf}${d.elegivel ? '' : ' (inativo)'}</div>`
         ).join('');
         const podeDep = f.planoPermiteDependentes
           && f.dependentes.length < empresa.limiteDependentes;
         return `<div class="item">
           <div class="item-corpo">
             <div class="item-nome">${f.nome}</div>
-            <div class="item-detalhe">${f.matricula} · plano ${f.plano || 'nenhum'}</div>
+            <div class="item-detalhe">${f.matricula} · CPF ${f.cpf} · plano ${f.plano || 'nenhum'}</div>
             ${deps}
           </div>
           ${f.elegivel ? selo('Ativo', 'aprovado') : selo('Sem acesso', 'inativo')}
@@ -585,6 +585,7 @@ $('#form-funcionario').addEventListener('submit', ev => {
   }
   executar(() => api(`/empresas/${empresaId}/funcionarios`, 'POST', {
     nome,
+    cpf: $('#func-cpf').value.trim(),
     matricula: $('#func-matricula').value.trim(),
     planoId
   }).then(() => ev.target.reset()),
@@ -607,9 +608,11 @@ $('#vista-empresa').addEventListener('click', ev => {
   if (dependente !== undefined) {
     const nome = prompt('Nome do dependente:');
     if (!nome) return;
+    const cpf = prompt('CPF do dependente:');
+    if (!cpf) return;
     const grau = prompt('Grau de parentesco:', 'Filho') || 'Dependente';
     executar(() => api(`/empresas/${empresaId}/funcionarios/${dependente}/dependentes`, 'POST',
-      { nome, grauParentesco: grau }), `${nome} incluído como dependente.`);
+      { nome, cpf, grauParentesco: grau }), `${nome} incluído como dependente.`);
   }
 
   if (remover !== undefined) {
@@ -812,6 +815,17 @@ $('#form-codigo').addEventListener('submit', ev => {
   conferencia = null;
   executar(async () => {
     conferencia = await api(caminhoRecepcao(codigo));
+    ev.target.reset();
+  });
+});
+
+/* extensão 2a: sem o código, busca pelo CPF; validar e recusar seguem pelo código achado */
+$('#form-cpf').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const cpf = $('#recepcao-cpf').value.replace(/\D/g, '');
+  conferencia = null;
+  executar(async () => {
+    conferencia = await api(`/recepcao/${estabelecimentoId}/cpf/${cpf}`);
     ev.target.reset();
   });
 });

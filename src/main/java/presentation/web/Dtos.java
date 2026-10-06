@@ -21,9 +21,9 @@ public class Dtos {
                                      List<ModalidadeDto> modalidades,
                                      List<InstrutorDto> instrutores) {}
 
-    public record DependenteDto(String nome, String grauParentesco, boolean elegivel) {}
+    public record DependenteDto(String nome, String cpf, String grauParentesco, boolean elegivel) {}
 
-    public record FuncionarioDto(int id, String nome, String matricula, String plano,
+    public record FuncionarioDto(int id, String nome, String cpf, String matricula, String plano,
                                  boolean elegivel, boolean planoPermiteDependentes,
                                  List<DependenteDto> dependentes) {}
 

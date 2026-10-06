@@ -50,9 +50,9 @@ public class Repositorio {
     /** Adesão vigente de um aluno, ou null se não houver. */
     public Adesao adesaoDe(Aluno aluno) {
         return adesoes.stream()
-            .filter(a -> a.getAluno() == aluno)
-            .filter(a -> a.getSituacao() != SituacaoAdesao.ENCERRADA)
-            .findFirst().orElse(null);
+                .filter(a -> a.getAluno() == aluno)
+                .filter(a -> a.getSituacao() != SituacaoAdesao.ENCERRADA)
+                .findFirst().orElse(null);
     }
 
     /**
@@ -81,13 +81,23 @@ public class Repositorio {
         int total = 0;
         for (Reserva r : reservas) {
             boolean contaNoLimite = r.getSituacao() != SituacaoReserva.CANCELADA
-                                 || r.isPenalizada();
+                    || r.isPenalizada();
             if (r.getAluno() == aluno && contaNoLimite
                     && YearMonth.from(r.getDataHoraReserva()).equals(mes)) {
                 total++;
             }
         }
         return total;
+    }
+
+    /** Aluno com este CPF, ou null. Ignora a pontuação. */
+    public Aluno alunoPorCpf(String cpf) {
+        for (Aluno a : alunos) {
+            if (a.temCpf(cpf)) {
+                return a;
+            }
+        }
+        return null;
     }
 
     /** UC07 - check-in com este código, ou null. Ignora maiúsculas e espaços. */

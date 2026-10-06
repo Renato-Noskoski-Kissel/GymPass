@@ -1,6 +1,7 @@
 package application.plano;
 
 import dominio.RegraDeNegocioException;
+import dominio.cadastroRede.Aluno;
 import dominio.cadastroRede.Dependente;
 import dominio.cadastroRede.Empresa;
 import dominio.cadastroRede.Funcionario;
@@ -28,11 +29,13 @@ public class BeneficiariosService {
     }
 
     /** Inclusão no quadro e concessão do plano acontecem na mesma operação. */
-    public void incluirFuncionario(int empresaId, String nome, String matricula, int planoId) {
+    public void incluirFuncionario(int empresaId, String nome, String cpf,
+                                   String matricula, int planoId) {
         Empresa empresa = empresa(empresaId);
         Plano plano = repositorio.getPlanos().get(planoId);
+        exigirCpfLivre(cpf);
 
-        Funcionario funcionario = new Funcionario(nome, "000.000.000-00", emailDe(nome),
+        Funcionario funcionario = new Funcionario(nome, cpf, emailDe(nome),
                 matricula, LocalDate.now(), empresa);
 
         repositorio.getAdesoes().add(Adesao.cadastrarBeneficiario(funcionario, plano));
@@ -46,11 +49,12 @@ public class BeneficiariosService {
     }
 
     public void incluirDependente(int empresaId, int funcionarioId,
-                                  String nome, String grauParentesco) {
+                                  String nome, String cpf, String grauParentesco) {
         Adesao adesao = adesaoVigente(empresaId, funcionarioId);
         Funcionario responsavel = empresa(empresaId).getFuncionarios().get(funcionarioId);
+        exigirCpfLivre(cpf);
 
-        Dependente dependente = new Dependente(nome, "000.000.000-00", emailDe(nome),
+        Dependente dependente = new Dependente(nome, cpf, emailDe(nome),
                 grauParentesco, responsavel);
 
         repositorio.getAdesoes().add(adesao.incluirDependente(dependente));
@@ -60,6 +64,18 @@ public class BeneficiariosService {
     public void removerFuncionario(int empresaId, int funcionarioId) {
         Empresa empresa = empresa(empresaId);
         empresa.removerFuncionario(empresa.getFuncionarios().get(funcionarioId));
+    }
+
+    /**
+     * O CPF identifica o aluno na recepção (UC07, 2a), então não pode repetir.
+     * Fica aqui porque só a lista de todos os alunos sabe se ele já existe.
+     */
+    private void exigirCpfLivre(String cpf) {
+        Aluno existente = repositorio.alunoPorCpf(cpf);
+        if (existente != null) {
+            throw new RegraDeNegocioException(
+                    "O CPF " + cpf + " já está cadastrado para " + existente + ".");
+        }
     }
 
     private Adesao adesaoVigente(int empresaId, int funcionarioId) {

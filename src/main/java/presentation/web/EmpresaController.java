@@ -14,14 +14,15 @@ public class EmpresaController {
         this.servico = servico;
     }
 
-    public record NovoFuncionario(String nome, String matricula, int planoId) {}
+    public record NovoFuncionario(String nome, String cpf, String matricula, int planoId) {}
     public record TrocaDePlano(int planoId) {}
-    public record NovoDependente(String nome, String grauParentesco) {}
+    public record NovoDependente(String nome, String cpf, String grauParentesco) {}
 
     @PostMapping("/funcionarios")
     public void incluirFuncionario(@PathVariable int empresaId,
                                    @RequestBody NovoFuncionario dados) {
-        servico.incluirFuncionario(empresaId, dados.nome(), dados.matricula(), dados.planoId());
+        servico.incluirFuncionario(empresaId, dados.nome(), dados.cpf(), dados.matricula(),
+                dados.planoId());
     }
 
     @PostMapping("/funcionarios/{funcionarioId}/plano")
@@ -33,7 +34,8 @@ public class EmpresaController {
     @PostMapping("/funcionarios/{funcionarioId}/dependentes")
     public void incluirDependente(@PathVariable int empresaId, @PathVariable int funcionarioId,
                                   @RequestBody NovoDependente dados) {
-        servico.incluirDependente(empresaId, funcionarioId, dados.nome(), dados.grauParentesco());
+        servico.incluirDependente(empresaId, funcionarioId, dados.nome(), dados.cpf(),
+                dados.grauParentesco());
     }
 
     @DeleteMapping("/funcionarios/{funcionarioId}")

@@ -44,8 +44,27 @@ public class CheckInService {
         CheckIn checkIn = repositorio.checkInPorCodigo(codigo);
         if (checkIn == null) {
             throw new RegraDeNegocioException(
-                "Nenhum check-in com o código " + codigo
-                + ". Peça ao aluno para refazer o check-in.");
+                    "Nenhum check-in com o código " + codigo
+                            + ". Peça ao aluno para refazer o check-in.");
+        }
+        checkIn.conferirNaRecepcao(recepcao);
+        return checkIn;
+    }
+
+    /**
+     * UC07 extensão 2a - sem o código, a recepção busca pelo CPF. Localiza o
+     * check-in mais recente do aluno e segue as mesmas conferências (3a, 3c).
+     */
+    public CheckIn localizarPorCpfNaRecepcao(int estabelecimentoId, String cpf) {
+        Estabelecimento recepcao = repositorio.getEstabelecimentos().get(estabelecimentoId);
+        Aluno aluno = repositorio.alunoPorCpf(cpf);
+        if (aluno == null) {
+            throw new RegraDeNegocioException("Nenhum aluno com o CPF " + cpf + ".");
+        }
+        CheckIn checkIn = repositorio.ultimoCheckInDe(aluno);
+        if (checkIn == null) {
+            throw new RegraDeNegocioException(
+                    aluno + " não tem check-in. Peça ao aluno para fazer o check-in.");
         }
         checkIn.conferirNaRecepcao(recepcao);
         return checkIn;

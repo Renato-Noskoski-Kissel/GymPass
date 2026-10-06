@@ -1,5 +1,6 @@
 package dominio.cadastroRede;
 
+import dominio.RegraDeNegocioException;
 import java.time.LocalDate;
 
 /**
@@ -19,10 +20,29 @@ public abstract class Aluno {
 
     protected Aluno(String nome, String cpf, String email) {
         this.nome = nome;
-        this.cpf = cpf;
+        this.cpf = formatarCpf(cpf);
         this.email = email;
         this.dataCadastro = LocalDate.now();
         this.situacao = SituacaoAluno.ATIVO;
+    }
+
+    /** Aceita com ou sem pontuação; guarda como 000.000.000-00. Não confere dígitos verificadores. */
+    private static String formatarCpf(String cpf) {
+        String d = apenasDigitos(cpf);
+        if (d.length() != 11) {
+            throw new RegraDeNegocioException("O CPF precisa ter 11 dígitos: " + cpf);
+        }
+        return d.substring(0, 3) + "." + d.substring(3, 6) + "." + d.substring(6, 9)
+                + "-" + d.substring(9);
+    }
+
+    private static String apenasDigitos(String texto) {
+        return texto == null ? "" : texto.replaceAll("\\D", "");
+    }
+
+    /** UC07 extensão 2a - este aluno tem este CPF? Ignora a pontuação. */
+    public boolean temCpf(String outroCpf) {
+        return apenasDigitos(cpf).equals(apenasDigitos(outroCpf));
     }
 
     public String getNome() { return nome; }

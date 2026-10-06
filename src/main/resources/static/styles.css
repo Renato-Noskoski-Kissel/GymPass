@@ -357,6 +357,7 @@ body {
 .campo { display: flex; flex-direction: column; gap: .22rem; min-width: 0; }
 .formulario.linha .campo { flex: 1 1 150px; }
 .formulario.linha .campo.estreito { flex: 0 1 96px; }
+.formulario.linha .acao { align-self: flex-end; }
 
 .campo label { font-size: .82rem; color: var(--tinta-70); }
 
