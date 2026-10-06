@@ -47,11 +47,20 @@ public class Dtos {
     public record AlunoDto(int id, String nome, String tipo, String empresa, String plano,
                            int limiteAulasMes, int reservasNoMes, boolean elegivel) {}
 
-    public record CheckInDto(int id, int alunoId, String estabelecimento, String quando,
-                             boolean hoje, String situacao) {}
+    public record CheckInDto(int id, int alunoId, String aluno, int estabelecimentoId,
+                             String estabelecimento, String quando, boolean hoje,
+                             String codigo, String situacao, String motivoRecusa) {}
 
-    public record ReservaDto(int id, int alunoId, int aulaId, String aula, String quando,
-                             String feitaEm, String situacao) {}
+    /** UC07 passo 4 - só o que a recepção pode ver (RNF3). */
+    public record ConferenciaDto(String codigo, String aluno, String quando, String situacao) {}
+
+    public record ReservaDto(int id, int alunoId, int aulaId, String aula,
+                             String inicio, String quando, long duracaoMin,
+                             String instrutor, String endereco, String feitaEm,
+                             String situacao, boolean penalizada,
+                             boolean aulaCancelada, boolean aulaJaComecou,
+                             String prazoSemPenalidade, String tempoAtePrazo,
+                             boolean cancelamentoPenalizado) {}
 
     public record EstadoDto(List<EstabelecimentoDto> estabelecimentos,
                             List<EmpresaDto> empresas,

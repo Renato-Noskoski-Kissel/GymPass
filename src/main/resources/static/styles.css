@@ -445,6 +445,55 @@ button:focus-visible {
 .comprovante-titulo { font-weight: 600; color: var(--verde); }
 .comprovante-linha { font-size: .86rem; margin-top: .1rem; }
 
+.comprovante-codigo {
+  margin: .35rem 0 .3rem;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.comprovante.recusado { background: #f8ecec; border-color: #dfbcbc; }
+.comprovante.recusado .comprovante-titulo { color: var(--carmim); }
+.comprovante.validado .comprovante-codigo { color: var(--tinta-40); text-decoration: line-through; }
+
+/* ---------- reservas e recepção ---------- */
+
+.item-detalhe.alerta { color: var(--carmim); }
+
+.item.empilhado { flex-direction: column; align-items: stretch; gap: .5rem; }
+.item-acoes { display: flex; align-items: center; gap: .6rem; }
+
+.lista-titulo {
+  margin: 1rem 0 .1rem;
+  font-size: .82rem;
+  color: var(--tinta-70);
+}
+
+.formulario.inicial { margin-top: 0; padding-top: 0; border-top: none; }
+
+.entrada-codigo {
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.entrada-codigo::placeholder { color: var(--linha); }
+
+.conferencia {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--linha);
+}
+
+.conferencia-nome { font-size: 1.35rem; font-weight: 600; letter-spacing: -.01em; }
+.conferencia .selo { align-self: flex-start; }
+
 .secao-cabeca { margin: .4rem 0 .8rem; }
 .secao-cabeca h2 { margin: 0; font-size: 1.02rem; font-weight: 600; }
 

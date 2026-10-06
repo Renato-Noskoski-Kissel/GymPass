@@ -3,6 +3,7 @@ package persistencia;
 import dominio.acessoAgenda.Aula;
 import dominio.acessoAgenda.CheckIn;
 import dominio.acessoAgenda.Reserva;
+import dominio.acessoAgenda.SituacaoReserva;
 import dominio.cadastroRede.*;
 import dominio.planosAdesao.Adesao;
 import dominio.planosAdesao.Plano;
@@ -69,18 +70,36 @@ public class Repositorio {
     }
 
     /**
-     * UC04a - reservas que o aluno fez no mês informado.
-     * Conta pela data em que a reserva foi feita, não pela data da aula.
+     * UC04a - reservas que o aluno fez no mês informado e que contam para o
+     * limite do plano. Conta pela data em que a reserva foi feita, não pela
+     * data da aula.
+     *
+     * Cancelada no prazo (UC04b) devolve a aula ao limite; cancelada com
+     * penalidade continua contando.
      */
     public int totalReservasNoMes(Aluno aluno, YearMonth mes) {
         int total = 0;
         for (Reserva r : reservas) {
-            if (r.getAluno() == aluno
+            boolean contaNoLimite = r.getSituacao() != SituacaoReserva.CANCELADA
+                                 || r.isPenalizada();
+            if (r.getAluno() == aluno && contaNoLimite
                     && YearMonth.from(r.getDataHoraReserva()).equals(mes)) {
                 total++;
             }
         }
         return total;
+    }
+
+    /** UC07 - check-in com este código, ou null. Ignora maiúsculas e espaços. */
+    public CheckIn checkInPorCodigo(String codigo) {
+        if (codigo == null) return null;
+        String procurado = codigo.trim().toUpperCase();
+        for (CheckIn c : checkIns) {
+            if (c.getCodigo().equals(procurado)) {
+                return c;
+            }
+        }
+        return null;
     }
 
     private void semear() {
@@ -154,5 +173,10 @@ public class Repositorio {
         aulas.add(studio.agendarAula(amanha, Duration.ofMinutes(50), 8, pilates, ana));
         aulas.add(studio.agendarAula(amanha.plusHours(11), Duration.ofMinutes(60), 2, pilates, ana));
         aulas.add(studio.agendarAula(amanha.plusHours(12), Duration.ofMinutes(60), 10, yoga, caio));
+
+        // UC04b - começa em 90 min: o prazo sem penalidade (2 h antes, RN5) já passou,
+        // então reservar e cancelar esta aula gera cancelamento penalizado.
+        LocalDateTime daquiA90 = LocalDateTime.now().plusMinutes(90).withSecond(0).withNano(0);
+        aulas.add(studio.agendarAula(daquiA90, Duration.ofMinutes(50), 6, pilates, ana));
     }
 }

@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 import persistencia.Repositorio;
 import presentation.web.Dtos.*;
 
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -173,17 +175,28 @@ public class MontadorDeEstado {
             CheckIn c = lista.get(i);
             saida.add(new CheckInDto(i,
                     repositorio.getAlunos().indexOf(c.getAluno()),
+                    c.getAluno().getNome(),
+                    repositorio.getEstabelecimentos().indexOf(c.getEstabelecimento()),
                     c.getEstabelecimento().getNomeFantasia(),
                     c.getDataHora().format(LEGIVEL),
                     c.getDataHora().toLocalDate().equals(hoje),
-                    c.getSituacaoValidacao().name()));
+                    c.getCodigo(),
+                    c.getSituacaoValidacao().name(),
+                    c.getMotivoRecusa()));
         }
         return saida;
+    }
+
+    /** UC07 passo 4 - o que a recepção vê ao localizar um check-in. */
+    public ConferenciaDto conferencia(CheckIn c) {
+        return new ConferenciaDto(c.getCodigo(), c.getAluno().getNome(),
+                c.getDataHora().format(LEGIVEL), c.getSituacaoValidacao().name());
     }
 
     private List<ReservaDto> reservas() {
         List<ReservaDto> saida = new ArrayList<>();
         List<Reserva> lista = repositorio.getReservas();
+        LocalDateTime agora = LocalDateTime.now();
         for (int i = 0; i < lista.size(); i++) {
             Reserva r = lista.get(i);
             Aula a = r.getAula();
@@ -191,10 +204,29 @@ public class MontadorDeEstado {
                     repositorio.getAlunos().indexOf(r.getAluno()),
                     repositorio.getAulas().indexOf(a),
                     a.getModalidade().getNome() + " em " + a.getEstabelecimento().getNomeFantasia(),
+                    a.getDataHoraInicio().format(ISO),
                     a.getDataHoraInicio().format(LEGIVEL),
+                    a.getDuracao().toMinutes(),
+                    a.getInstrutor().getNome(),
+                    a.getEstabelecimento().getEndereco().toString(),
                     r.getDataHoraReserva().format(LEGIVEL),
-                    r.getSituacao().name()));
+                    r.getSituacao().name(),
+                    r.isPenalizada(),
+                    a.estaCancelada(),
+                    a.jaComecou(),
+                    r.prazoSemPenalidade().format(LEGIVEL),
+                    tempoAte(agora, r.prazoSemPenalidade()),
+                    r.cancelamentoSeriaPenalizado(agora)));
         }
         return saida;
+    }
+
+    /** UC04b passo 2e - "faltam 1 d 3 h", "faltam 2 h 15 min"; null se já passou. */
+    private String tempoAte(LocalDateTime agora, LocalDateTime limite) {
+        if (!agora.isBefore(limite)) return null;
+        Duration d = Duration.between(agora, limite);
+        if (d.toDays() > 0) return "faltam " + d.toDays() + " d " + d.toHoursPart() + " h";
+        if (d.toHours() > 0) return "faltam " + d.toHours() + " h " + d.toMinutesPart() + " min";
+        return "faltam " + Math.max(1, d.toMinutes()) + " min";
     }
 }

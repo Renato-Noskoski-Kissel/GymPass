@@ -28,6 +28,7 @@ let coberturaEstabelecimentoId = 0;
 let alunoId = 0;
 let checkinEstabelecimentoId = null;
 let coordenadasDe = null;   // estabelecimento cujas coordenadas estão nos campos do check-in
+let conferencia = null;     // UC07: check-in localizado pela recepção (código, aluno, quando)
 
 /* ---------- comunicação com o servidor ---------- */
 
@@ -309,7 +310,7 @@ function renderAluno() {
     </div>
     <div class="indicador">
       <div class="indicador-valor">${aluno.reservasNoMes} de ${aluno.limiteAulasMes}</div>
-      <div class="indicador-rotulo">aulas reservadas neste mês</div>
+      <div class="indicador-rotulo">aulas do limite usadas neste mês</div>
     </div>
     <div class="indicador">
       <div class="indicador-valor">${aluno.elegivel ? 'Ativo' : 'Sem acesso'}</div>
@@ -320,13 +321,22 @@ function renderAluno() {
   const meusCheckIns = estado.checkIns.filter(c => c.alunoId === aluno.id);
   $('#cont-checkins').textContent = `${meusCheckIns.length} registrados`;
   const deHoje = meusCheckIns.filter(c => c.hoje).pop();
-  $('#comprovante').innerHTML = deHoje
-    ? `<div class="comprovante">
-        <div class="comprovante-titulo">Check-in de hoje registrado</div>
+  const situacaoComprovante = {
+    PENDENTE: ['', 'Apresente este código na recepção'],
+    VALIDADO: [' validado', 'Entrada liberada pela recepção'],
+    RECUSADO: [' recusado', 'Entrada recusada pela recepção']
+  };
+  if (deHoje) {
+    const [classe, texto] = situacaoComprovante[deHoje.situacao];
+    $('#comprovante').innerHTML = `<div class="comprovante${classe}">
+        <div class="comprovante-titulo">Check-in de hoje</div>
+        <div class="comprovante-codigo">${deHoje.codigo}</div>
         <div class="comprovante-linha">${deHoje.estabelecimento}, ${deHoje.quando}</div>
-        <div class="comprovante-linha">Aguardando validação na recepção</div>
-      </div>`
-    : '<p class="vazio">Nenhum check-in hoje.</p>';
+        <div class="comprovante-linha">${texto}${deHoje.motivoRecusa ? ': ' + deHoje.motivoRecusa : ''}</div>
+      </div>`;
+  } else {
+    $('#comprovante').innerHTML = '<p class="vazio">Nenhum check-in hoje.</p>';
+  }
 
   const lista = credenciados();
   const est = estabelecimentoDoCheckin();
@@ -337,19 +347,50 @@ function renderAluno() {
   }
 
   /* reservas */
+  /* UC04b passo 1: confirmadas ainda não iniciadas, por data e hora */
   const minhas = estado.reservas.filter(r => r.alunoId === aluno.id);
-  $('#cont-reservas').textContent = `${minhas.length} feitas`;
-  $('#lista-reservas').innerHTML = minhas.length
-    ? minhas.map(r => `<div class="item">
-        <div class="item-corpo">
-          <div class="item-nome">${r.aula}</div>
-          <div class="item-detalhe">${r.quando} · reservada ${r.feitaEm}</div>
-        </div>
-        ${selo('Confirmada', 'aprovado')}
-      </div>`).join('')
-    : '<p class="vazio">Nenhuma reserva. Escolha uma aula abaixo.</p>';
+  const cancelavel = r => r.situacao === 'CONFIRMADA' && (r.aulaCancelada || !r.aulaJaComecou);
+  const ativas = minhas.filter(cancelavel).sort((a, b) => a.inicio.localeCompare(b.inicio));
+  const historico = minhas.filter(r => !cancelavel(r)).sort((a, b) => b.inicio.localeCompare(a.inicio));
+  $('#cont-reservas').textContent = `${ativas.length} ativas`;
 
-  const abertas = estado.aulas.filter(a => !a.cancelada && !a.jaComecou);
+  /* UC04b passo 2: dados da reserva, prazo, tempo restante e aviso de penalidade */
+  const prazo = r => r.aulaCancelada
+    ? '<div class="item-detalhe">Aula cancelada pelo estabelecimento. Cancelar não gera penalidade.</div>'
+    : r.cancelamentoPenalizado
+      ? `<div class="item-detalhe alerta">O prazo sem penalidade terminou (${r.prazoSemPenalidade}). Cancelar agora gera penalidade.</div>`
+      : `<div class="item-detalhe">Cancele sem penalidade até ${r.prazoSemPenalidade} (${r.tempoAtePrazo}).</div>`;
+
+  const htmlAtivas = ativas.map(r => `<div class="item empilhado">
+      <div class="item-corpo">
+        <div class="item-nome">${r.aula}</div>
+        <div class="item-detalhe">${r.quando} · ${r.duracaoMin} min · com ${r.instrutor}</div>
+        <div class="item-detalhe">${r.endereco}</div>
+        ${prazo(r)}
+      </div>
+      <div class="item-acoes">
+        <button class="acao discreta risco" data-cancelar-reserva="${r.id}">Cancelar reserva</button>
+        ${r.aulaCancelada ? selo('Aula cancelada', 'suspenso') : ''}
+      </div>
+    </div>`).join('');
+
+  const seloHistorico = r => r.situacao === 'CANCELADA'
+    ? (r.penalizada ? selo('Cancelada com penalidade', 'suspenso') : selo('Cancelada', 'inativo'))
+    : selo('Encerrada', 'inativo');
+  const htmlHistorico = historico.map(r => `<div class="item">
+      <div class="item-corpo">
+        <div class="item-nome">${r.aula}</div>
+        <div class="item-detalhe">${r.quando}</div>
+      </div>
+      ${seloHistorico(r)}
+    </div>`).join('');
+
+  $('#lista-reservas').innerHTML =
+    (ativas.length ? htmlAtivas : '<p class="vazio">Nenhuma reserva ativa. Escolha uma aula abaixo.</p>')
+    + (historico.length ? '<p class="lista-titulo">Histórico</p>' + htmlHistorico : '');
+
+  const abertas = estado.aulas.filter(a => !a.cancelada && !a.jaComecou)
+    .sort((a, b) => a.inicio.localeCompare(b.inicio));
   $('#aulas-reserva').innerHTML = abertas.length
     ? abertas.map(a => `<article class="aula">
         <div class="aula-quando">${a.inicioLegivel}</div>
@@ -363,12 +404,62 @@ function renderAluno() {
     : '<p class="vazio">Nenhuma aula aberta na rede.</p>';
 }
 
+/* ---------- UC07: recepção ---------- */
+
+const rotuloCheckIn = {
+  PENDENTE: ['Aguardando validação', 'pendente'],
+  VALIDADO: ['Entrada liberada', 'aprovado'],
+  RECUSADO: ['Recusado', 'suspenso']
+};
+
+function renderRecepcao() {
+  preencherSelect($('#recepcao-estabelecimento'), estado.estabelecimentos,
+    e => e.nome, estabelecimentoId);
+  const est = estabelecimentoAtual();
+  if (!est) return;
+
+  /* passo 4: nome do aluno e situação; a situação vem sempre do estado mais recente */
+  if (conferencia) {
+    const atual = estado.checkIns.find(c => c.codigo === conferencia.codigo);
+    const situacao = atual ? atual.situacao : conferencia.situacao;
+    const [rotulo, classe] = rotuloCheckIn[situacao];
+    $('#recepcao-resultado').innerHTML = `<div class="conferencia">
+        <div class="conferencia-nome">${conferencia.aluno}</div>
+        <div class="item-detalhe">Check-in ${conferencia.quando} · código ${conferencia.codigo}</div>
+        ${selo(rotulo, classe)}
+        ${situacao === 'PENDENTE' ? `<div class="botoes">
+          <button class="acao" data-validar>Liberar entrada</button>
+          <button class="acao discreta risco" data-recusar>Recusar entrada</button>
+        </div>` : ''}
+      </div>`;
+  } else {
+    $('#recepcao-resultado').innerHTML = '';
+  }
+
+  const deHoje = estado.checkIns.filter(c => c.estabelecimentoId === est.id && c.hoje);
+  const pendentes = deHoje.filter(c => c.situacao === 'PENDENTE').length;
+  $('#cont-recepcao').textContent = `${pendentes} aguardando`;
+  $('#lista-recepcao').innerHTML = deHoje.length
+    ? deHoje.slice().reverse().map(c => {
+        const [rotulo, classe] = rotuloCheckIn[c.situacao];
+        return `<div class="item">
+          <div class="item-corpo">
+            <div class="item-nome">${c.aluno}</div>
+            <div class="item-detalhe">${c.quando}${c.motivoRecusa ? ' · ' + c.motivoRecusa : ''}</div>
+          </div>
+          ${selo(rotulo, classe)}
+        </div>`;
+      }).join('')
+    : '<p class="vazio">Nenhum check-in neste estabelecimento hoje.</p>';
+}
+
 const vistas = {
   admin: { render: renderAdmin, contexto: 'Administração da plataforma' },
   empresa: { render: renderEmpresa, contexto: 'Visão da empresa contratante' },
   estabelecimento: { render: renderEstabelecimento, contexto: 'Visão do estabelecimento parceiro' },
   grade: { render: renderGrade, contexto: 'Grade de aulas do estabelecimento' },
-  aluno: { render: renderAluno, contexto: 'Visão do aluno' }
+  aluno: { render: renderAluno, contexto: 'Visão do aluno' },
+  recepcao: { render: renderRecepcao, contexto: 'Recepção do estabelecimento' }
 };
 
 function render() {
@@ -680,12 +771,66 @@ $('#form-checkin').addEventListener('submit', ev => {
 });
 
 $('#vista-aluno').addEventListener('click', ev => {
-  const { reservar } = ev.target.dataset;
-  if (reservar === undefined) return;
+  const { reservar, cancelarReserva } = ev.target.dataset;
   const aluno = alunoAtual();
-  const aula = estado.aulas.find(a => a.id === parseInt(reservar));
-  executar(() => api('/reservas', 'POST', { alunoId: aluno.id, aulaId: aula.id }),
-    `Vaga reservada: ${aula.modalidade}, ${aula.inicioLegivel}.`);
+
+  if (reservar !== undefined) {
+    const aula = estado.aulas.find(a => a.id === parseInt(reservar));
+    executar(() => api('/reservas', 'POST', { alunoId: aluno.id, aulaId: aula.id }),
+      `Vaga reservada: ${aula.modalidade}, ${aula.inicioLegivel}.`);
+  }
+
+  /* UC04b: passo 3 (confirmação) e extensão 4a.1 (confirmação adicional) */
+  if (cancelarReserva !== undefined) {
+    const r = estado.reservas.find(x => x.id === parseInt(cancelarReserva));
+    if (!confirm(`Cancelar a reserva de ${r.aula}, ${r.quando}?`)) return;   // 3a: desistiu
+    let aceitaPenalidade = false;
+    if (r.cancelamentoPenalizado) {
+      if (!confirm(`O prazo sem penalidade terminou (${r.prazoSemPenalidade}). `
+          + 'O cancelamento vai ficar registrado como penalizado. Cancelar mesmo assim?')) return;
+      aceitaPenalidade = true;
+    }
+    executar(() => api(`/reservas/${r.id}/cancelar`, 'POST', { alunoId: aluno.id, aceitaPenalidade }),
+      'Reserva cancelada. A vaga foi liberada.');
+  }
+});
+
+/* --- UC07 --- */
+
+$('#recepcao-estabelecimento').addEventListener('change', ev => {
+  estabelecimentoId = parseInt(ev.target.value);
+  conferencia = null;
+  render();
+});
+
+const caminhoRecepcao = codigo =>
+  `/recepcao/${estabelecimentoId}/checkins/${encodeURIComponent(codigo)}`;
+
+$('#form-codigo').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const codigo = $('#recepcao-codigo').value.trim().toUpperCase();
+  conferencia = null;
+  executar(async () => {
+    conferencia = await api(caminhoRecepcao(codigo));
+    ev.target.reset();
+  });
+});
+
+$('#vista-recepcao').addEventListener('click', ev => {
+  if (!conferencia) return;
+  const { validar, recusar } = ev.target.dataset;
+
+  if (validar !== undefined) {
+    executar(() => api(caminhoRecepcao(conferencia.codigo) + '/validar', 'POST'),
+      `Entrada de ${conferencia.aluno} liberada.`);
+  }
+
+  if (recusar !== undefined) {
+    const motivo = prompt('Motivo da recusa:');
+    if (motivo === null) return;
+    executar(() => api(caminhoRecepcao(conferencia.codigo) + '/recusar', 'POST', { motivo }),
+      `Entrada de ${conferencia.aluno} recusada.`);
+  }
 });
 
 /* ---------- início ---------- */

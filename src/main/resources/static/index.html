@@ -43,6 +43,10 @@
       <span class="perfil-papel">Aluno</span>
       <span class="perfil-tarefa">Check-in e reservas</span>
     </button>
+    <button class="perfil" data-vista="recepcao">
+      <span class="perfil-papel">Recepção</span>
+      <span class="perfil-tarefa">Validar check-in</span>
+    </button>
     <p class="perfis-nota">Conectado ao servidor Java. Os dados vivem enquanto a aplicação estiver rodando.</p>
   </nav>
 
@@ -397,6 +401,42 @@
 
       <div class="secao-cabeca"><h2>Próximas aulas</h2></div>
       <div id="aulas-reserva" class="aulas"></div>
+    </section>
+
+    <!-- ============ UC07: recepção ============ -->
+    <section class="vista oculta" id="vista-recepcao">
+      <div class="vista-cabeca">
+        <h1>Recepção</h1>
+        <p>Digite o código do comprovante que o aluno apresentar e libere a entrada.</p>
+      </div>
+
+      <div class="seletor">
+        <label for="recepcao-estabelecimento">Estabelecimento</label>
+        <select id="recepcao-estabelecimento"></select>
+      </div>
+
+      <div class="colunas">
+        <article class="bloco">
+          <div class="bloco-cabeca"><h2>Validar check-in</h2></div>
+          <form class="formulario inicial" id="form-codigo">
+            <div class="campo">
+              <label for="recepcao-codigo">Código do comprovante</label>
+              <input id="recepcao-codigo" class="entrada-codigo" required autocomplete="off"
+                     maxlength="6" placeholder="K7Q2MX">
+            </div>
+            <button class="acao" type="submit">Buscar check-in</button>
+          </form>
+          <div id="recepcao-resultado"></div>
+        </article>
+
+        <article class="bloco">
+          <div class="bloco-cabeca">
+            <h2>Check-ins de hoje</h2>
+            <span class="contagem" id="cont-recepcao"></span>
+          </div>
+          <div id="lista-recepcao" class="lista"></div>
+        </article>
+      </div>
     </section>
 
   </main>

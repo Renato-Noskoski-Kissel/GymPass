@@ -114,8 +114,9 @@ public class Main {
                 latPorta, lngPorta, null));
 
         // Basico cobre a academia
-        System.out.println("Check-in: " + adesaoCarla.registrarCheckIn(forte,
-                endForte.getLatitude(), endForte.getLongitude(), null));
+        CheckIn checkInCarla = adesaoCarla.registrarCheckIn(forte,
+                endForte.getLatitude(), endForte.getLongitude(), null);
+        System.out.println("Check-in: " + checkInCarla);
 
         // ===== UC04a - Reservar Vaga em Aula =====
         Aula turmaPequena = estudio.agendarAula(LocalDateTime.now().plusDays(1),
@@ -144,6 +145,46 @@ public class Main {
                 Duration.ofMinutes(50), 5, pilates, ana);
         cancelada.cancelar();
         tentar("cancelada", () -> adesaoLara.reservarVaga(cancelada, 1));
+
+        // ===== UC04b - Cancelar Reserva =====
+        // no prazo: sem penalidade, e a vaga volta para outro aluno
+        System.out.println("Vagas antes: " + turmaPequena.vagasDisponiveis());
+        reserva.cancelar(LocalDateTime.now());
+        System.out.println("Cancelada no prazo: " + reserva + " | vagas: "
+                + turmaPequena.vagasDisponiveis());
+        System.out.println("Vaga reaproveitada: " + adesaoMiguel.reservarVaga(turmaPequena, 1));
+
+        // menos de 2 h antes da aula (RN5): penalizada
+        Aula daquiAPouco = estudio.agendarAula(LocalDateTime.now().plusMinutes(90),
+                Duration.ofMinutes(50), 5, pilates, ana);
+        Reserva tardia = adesaoLara.reservarVaga(daquiAPouco, 1);
+        System.out.println("Seria penalizado? " + tardia.cancelamentoSeriaPenalizado(LocalDateTime.now()));
+        tardia.cancelar(LocalDateTime.now());
+        System.out.println("Cancelada tarde: " + tardia);
+
+        // 4b - aula ja comecou (o momento e passado de fora)
+        Reserva atrasada = adesaoLara.reservarVaga(daquiAPouco, 2);
+        tentar("4b aula comecou", () -> atrasada.cancelar(daquiAPouco.getDataHoraInicio().plusMinutes(5)));
+
+        // 4c - aula cancelada pelo estabelecimento: sem penalidade mesmo em cima da hora
+        daquiAPouco.cancelar();
+        atrasada.cancelar(LocalDateTime.now());
+        System.out.println("Aula cancelada pelo estabelecimento: " + atrasada);
+
+        // ja cancelada
+        tentar("cancelar duas vezes", () -> tardia.cancelar(LocalDateTime.now()));
+
+        // ===== UC07 - Validar Check-in na Recepcao =====
+        System.out.println("Codigo do comprovante: " + checkInLara.getCodigo());
+        tentar("3c outro estabelecimento", () -> checkInLara.conferirNaRecepcao(forte));
+        checkInLara.conferirNaRecepcao(estudio);
+        checkInLara.validar();
+        System.out.println("Validado: " + checkInLara);
+        tentar("validar duas vezes", checkInLara::validar);
+
+        tentar("recusa sem motivo", () -> checkInCarla.recusar("  "));
+        checkInCarla.recusar("Documento nao confere");
+        System.out.println("Recusado: " + checkInCarla + " - " + checkInCarla.getMotivoRecusa());
 
         // ===== HU2 - remocao do quadro derruba a elegibilidade em cascata (RN1) =====
         empresa.removerFuncionario(lara);
