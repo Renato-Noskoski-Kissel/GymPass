@@ -33,6 +33,9 @@ class Plataforma <<fachada>> {
   ''Falta Implementar/Validar : ..
   +assinarPlano(alunoId : int, planoId : int) : Adesao
   +cancelarAssinatura(alunoId : int) : void
+  -adesaoVigente(al : Aluno) : Adesao
+  -checkInDeHoje(al : Aluno) : CheckIn
+  -totalReservasNoMes(al : Aluno) : int
 
   .. Agendamento ..
   +agendar(estabelecimentoId : int, modalidadeId : int, instrutorId : int, inicio : String, duracaoMin : long, capacidade : int) : void
@@ -45,7 +48,7 @@ class Plataforma <<fachada>> {
   +consultarCalendario(alunoId : int) : List<Reserva>
 
   .. Controle de Acesso ..
-  ''falta tudo 
+  ''falta tudo
   +buscarEstabelecimentos(alunoId : int, latitude : double, longitude : double, raio : double, modalidade : String, tipo : String, dia : LocalDate, somenteCobertos : boolean) : List<Estabelecimento>
   +realizarCheckIn(alunoId : int, aulaId : int, estabelecimentoId : int, latitude : double, longitude : double) : CheckIn
   +validarCheckIn(codigo : String) : void
@@ -89,8 +92,10 @@ package "Planos e Adesão" {
     -limiteAulasMes : int
     -permiteDependentes : boolean
     -empresasQueOferecem : List<Empresa>
-    -estabelecimentosLiberados : List<Estabelecimento> ''n tem no codigo ainda
-    -modalidadesLiberadas : List<Modalidade> ''n tem no codigo ainda
+    ''n tem no codigo ainda
+    -estabelecimentosLiberados : List<Estabelecimento>
+    ''n tem no codigo ainda
+    -modalidadesLiberadas : List<Modalidade>
     +getNome() : String
     +getNivel() : int
     +getValorMensal() : double
@@ -210,8 +215,10 @@ package "Cadastro e Rede" {
     -cnpj : String
     -situacaoCredenciamento : SituacaoCredenciamento
     -valorPorCheckIn : double
-    -endereco : Endereco ''n tem no codigo ainda
-    -aulas : List<Aula> ''n ta implementado
+    ''n tem no codigo ainda
+    -endereco : Endereco
+    ''n tem no codigo ainda
+    -aulas : List<Aula>
     -modalidades : List<Modalidade>
     -instrutores : List<Instrutor>
     +aprovarCredenciamento() : void
@@ -249,7 +256,7 @@ package "Cadastro e Rede" {
       +isCoberta() : boolean
     }
   }
-  
+
   ''Falta a classe endereço na implementação!
   class Endereco {
     -logradouro : String
@@ -301,7 +308,8 @@ package "Acesso e Agenda" {
     -estabelecimento : Estabelecimento
     -modalidade : Modalidade
     -instrutor : Instrutor
-    -reservas : List<Reserva> ''n tem no codigo ainda
+    ''n tem no codigo ainda
+    -reservas : List<Reserva>
     {static}-validar(inicio : LocalDateTime, capacidade : int, e : Estabelecimento, m : Modalidade, i : Instrutor) : void
     +atribuirInstrutor(i : Instrutor) : void
     +alterarCapacidade(c : int) : void
