@@ -1,6 +1,8 @@
 package dominio.planosAdesao;
 
 import dominio.cadastroRede.Empresa;
+import dominio.cadastroRede.Estabelecimento;
+import dominio.cadastroRede.Modalidade;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -8,8 +10,9 @@ import java.util.List;
 /**
  * HU4 - nível de assinatura configurado pelo administrador.
  *
- * As liberações de modalidade e de estabelecimento (RF5) entram na
- * iteração 2, junto com a reserva de aulas e o check-in.
+ * RF5 - o plano define quais estabelecimentos e quais modalidades libera.
+ * O check-in exige o estabelecimento liberado; a reserva exige o
+ * estabelecimento e a modalidade da aula.
  */
 public class Plano {
 
@@ -21,6 +24,10 @@ public class Plano {
 
     /** Empresas que oferecem este plano aos seus funcionários. */
     private final List<Empresa> empresasQueOferecem = new ArrayList<>();
+
+    /** RF5 - cobertura do plano. */
+    private final List<Estabelecimento> estabelecimentosLiberados = new ArrayList<>();
+    private final List<Modalidade> modalidadesLiberadas = new ArrayList<>();
 
     public Plano(String nome, int nivel, double valorMensal,
                  int limiteAulasMes, boolean permiteDependentes) {
@@ -48,8 +55,40 @@ public class Plano {
         return empresasQueOferecem.contains(empresa);
     }
 
+    /** RF5 - o administrador inclui um estabelecimento na cobertura do plano. */
+    public void liberar(Estabelecimento estabelecimento) {
+        if (!estabelecimentosLiberados.contains(estabelecimento)) {
+            estabelecimentosLiberados.add(estabelecimento);
+        }
+    }
+
+    /** RF5 - o administrador inclui uma modalidade na cobertura do plano. */
+    public void liberar(Modalidade modalidade) {
+        if (!modalidadesLiberadas.contains(modalidade)) {
+            modalidadesLiberadas.add(modalidade);
+        }
+    }
+
+    /** RF5 - o plano cobre este estabelecimento? */
+    public boolean libera(Estabelecimento estabelecimento) {
+        return estabelecimentosLiberados.contains(estabelecimento);
+    }
+
+    /** RF5 - o plano cobre esta modalidade? */
+    public boolean libera(Modalidade modalidade) {
+        return modalidadesLiberadas.contains(modalidade);
+    }
+
     public List<Empresa> getEmpresasQueOferecem() {
         return Collections.unmodifiableList(empresasQueOferecem);
+    }
+
+    public List<Estabelecimento> getEstabelecimentosLiberados() {
+        return Collections.unmodifiableList(estabelecimentosLiberados);
+    }
+
+    public List<Modalidade> getModalidadesLiberadas() {
+        return Collections.unmodifiableList(modalidadesLiberadas);
     }
 
     @Override public String toString() { return nome; }

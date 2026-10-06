@@ -5,8 +5,8 @@ public class Estudio extends Estabelecimento {
     private final int capacidadePadraoTurma;
 
     public Estudio(String nomeFantasia, String cnpj, double valorPorCheckIn,
-                   int capacidadePadraoTurma) {
-        super(nomeFantasia, cnpj, valorPorCheckIn);
+                   Endereco endereco, int capacidadePadraoTurma) {
+        super(nomeFantasia, cnpj, valorPorCheckIn, endereco);
         this.capacidadePadraoTurma = capacidadePadraoTurma;
     }
 

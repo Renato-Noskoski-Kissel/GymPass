@@ -22,12 +22,17 @@ public class GestaoParceirosService {
         this.repositorio = repositorio;
     }
 
-    public void cadastrarEstabelecimento(String nome, String tipo, double valorPorCheckIn) {
+    public void cadastrarEstabelecimento(String nome, String tipo, double valorPorCheckIn,
+                                         String logradouro, String numero, String bairro,
+                                         String cidade, String cep,
+                                         double latitude, double longitude) {
         String cnpj = "00.000.000/0001-00";
+        Endereco endereco = new Endereco(logradouro, numero, bairro, cidade, cep,
+                latitude, longitude);
         Estabelecimento novo = switch (tipo) {
-            case "Academia" -> new Academia(nome, cnpj, valorPorCheckIn, false);
-            case "Quadra"   -> new Quadra(nome, cnpj, valorPorCheckIn, false);
-            default         -> new Estudio(nome, cnpj, valorPorCheckIn, 15);
+            case "Academia" -> new Academia(nome, cnpj, valorPorCheckIn, endereco, false);
+            case "Quadra"   -> new Quadra(nome, cnpj, valorPorCheckIn, endereco, false);
+            default         -> new Estudio(nome, cnpj, valorPorCheckIn, endereco, 15);
         };
         repositorio.getEstabelecimentos().add(novo);
     }
@@ -50,5 +55,18 @@ public class GestaoParceirosService {
         Plano plano = new Plano(nome, nivel, valorMensal, limiteAulasMes, permiteDependentes);
         repositorio.getEmpresas().forEach(plano::oferecerPara);
         repositorio.getPlanos().add(plano);
+    }
+
+    /** RF5 - inclui um estabelecimento na cobertura do plano. */
+    public void liberarEstabelecimento(int planoId, int estabelecimentoId) {
+        Plano plano = repositorio.getPlanos().get(planoId);
+        plano.liberar(repositorio.getEstabelecimentos().get(estabelecimentoId));
+    }
+
+    /** RF5 - inclui uma modalidade de um estabelecimento na cobertura do plano. */
+    public void liberarModalidade(int planoId, int estabelecimentoId, int modalidadeId) {
+        Plano plano = repositorio.getPlanos().get(planoId);
+        Estabelecimento est = repositorio.getEstabelecimentos().get(estabelecimentoId);
+        plano.liberar(est.getModalidades().get(modalidadeId));
     }
 }

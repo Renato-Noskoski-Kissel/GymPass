@@ -39,6 +39,10 @@
       <span class="perfil-papel">Grade de aulas</span>
       <span class="perfil-tarefa">Turmas e professores</span>
     </button>
+    <button class="perfil" data-vista="aluno">
+      <span class="perfil-papel">Aluno</span>
+      <span class="perfil-tarefa">Check-in e reservas</span>
+    </button>
     <p class="perfis-nota">Conectado ao servidor Java. Os dados vivem enquanto a aplicação estiver rodando.</p>
   </nav>
 
@@ -76,6 +80,40 @@
               <div class="campo">
                 <label for="est-valor">Valor por check-in</label>
                 <input id="est-valor" type="number" min="0" step="0.5" value="12" required>
+              </div>
+            </div>
+            <div class="par">
+              <div class="campo">
+                <label for="est-logradouro">Logradouro</label>
+                <input id="est-logradouro" required placeholder="Rua Lauro Linhares">
+              </div>
+              <div class="campo estreito">
+                <label for="est-numero">Número</label>
+                <input id="est-numero" required placeholder="1200">
+              </div>
+            </div>
+            <div class="par">
+              <div class="campo">
+                <label for="est-bairro">Bairro</label>
+                <input id="est-bairro" required placeholder="Trindade">
+              </div>
+              <div class="campo">
+                <label for="est-cep">CEP</label>
+                <input id="est-cep" required placeholder="88036-002">
+              </div>
+            </div>
+            <div class="campo">
+              <label for="est-cidade">Cidade</label>
+              <input id="est-cidade" required value="Florianópolis">
+            </div>
+            <div class="par">
+              <div class="campo">
+                <label for="est-lat">Latitude</label>
+                <input id="est-lat" type="number" step="any" min="-90" max="90" required placeholder="-27.5893">
+              </div>
+              <div class="campo">
+                <label for="est-lng">Longitude</label>
+                <input id="est-lng" type="number" step="any" min="-180" max="180" required placeholder="-48.5196">
               </div>
             </div>
             <button class="acao" type="submit">Cadastrar estabelecimento</button>
@@ -141,6 +179,23 @@
           </div>
           <button class="acao" type="submit">Criar plano</button>
         </form>
+
+        <form class="formulario linha" id="form-cobertura">
+          <div class="campo">
+            <label for="cob-plano">Plano</label>
+            <select id="cob-plano" required></select>
+          </div>
+          <div class="campo">
+            <label for="cob-estabelecimento">Estabelecimento</label>
+            <select id="cob-estabelecimento" required></select>
+          </div>
+          <div class="campo">
+            <label for="cob-modalidade">O que liberar</label>
+            <select id="cob-modalidade"></select>
+          </div>
+          <button class="acao" type="submit">Liberar no plano</button>
+        </form>
+        <p class="dica">O check-in exige o estabelecimento liberado. A reserva exige o estabelecimento e a modalidade da aula.</p>
       </article>
     </section>
 
@@ -283,6 +338,65 @@
           <button class="acao" type="submit">Agendar aula</button>
         </form>
       </article>
+    </section>
+
+    <!-- ============ UC03 e UC04a: aluno ============ -->
+    <section class="vista oculta" id="vista-aluno">
+      <div class="vista-cabeca">
+        <h1>Check-in e reservas</h1>
+        <p>Faça check-in ao chegar no estabelecimento e reserve vaga nas aulas com turma limitada.</p>
+      </div>
+
+      <div class="seletor">
+        <label for="aluno-atual">Aluno</label>
+        <select id="aluno-atual"></select>
+      </div>
+
+      <div class="indicadores" id="indicadores-aluno"></div>
+
+      <div class="colunas">
+        <article class="bloco">
+          <div class="bloco-cabeca">
+            <h2>Check-in</h2>
+            <span class="contagem" id="cont-checkins"></span>
+          </div>
+          <div id="comprovante"></div>
+
+          <form class="formulario" id="form-checkin">
+            <div class="campo">
+              <label for="checkin-estabelecimento">Estabelecimento</label>
+              <select id="checkin-estabelecimento" required></select>
+            </div>
+            <div class="par">
+              <div class="campo">
+                <label for="checkin-lat">Latitude</label>
+                <input id="checkin-lat" type="number" step="any" min="-90" max="90" required>
+              </div>
+              <div class="campo">
+                <label for="checkin-lng">Longitude</label>
+                <input id="checkin-lng" type="number" step="any" min="-180" max="180" required>
+              </div>
+            </div>
+            <div class="botoes">
+              <button class="acao discreta" type="button" id="loc-porta">Na porta</button>
+              <button class="acao discreta" type="button" id="loc-longe">A 1 km</button>
+              <button class="acao discreta" type="button" id="loc-navegador">Usar localização do navegador</button>
+            </div>
+            <button class="acao" type="submit">Fazer check-in</button>
+          </form>
+        </article>
+
+        <article class="bloco">
+          <div class="bloco-cabeca">
+            <h2>Minhas reservas</h2>
+            <span class="contagem" id="cont-reservas"></span>
+          </div>
+          <div id="lista-reservas" class="lista"></div>
+        </article>
+      </div>
+
+      <div class="secao-cabeca"><h2>Próximas aulas</h2></div>
+      <div id="aulas-reserva" class="aulas"></div>
     </section>
 
   </main>

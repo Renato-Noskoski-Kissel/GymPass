@@ -13,11 +13,21 @@
 const $ = sel => document.querySelector(sel);
 
 /** Estado devolvido pelo servidor. Nunca é modificado aqui. */
-let estado = { estabelecimentos: [], empresas: [], planos: [], aulas: [] };
+let estado = {
+  estabelecimentos: [], empresas: [], planos: [], aulas: [],
+  alunos: [], checkIns: [], reservas: []
+};
 
 let vistaAtual = 'admin';
 let empresaId = 0;
 let estabelecimentoId = 0;
+
+/* seleções que precisam sobreviver ao redesenho da tela */
+let coberturaPlanoId = 0;
+let coberturaEstabelecimentoId = 0;
+let alunoId = 0;
+let checkinEstabelecimentoId = null;
+let coordenadasDe = null;   // estabelecimento cujas coordenadas estão nos campos do check-in
 
 /* ---------- comunicação com o servidor ---------- */
 
@@ -86,6 +96,14 @@ function preencherSelect(el, itens, rotulo, idSelecionado) {
     .join('');
 }
 
+/** Uma barra por vaga; as reservadas aparecem preenchidas. */
+function barraDeVagas(aula) {
+  const ocupadas = aula.capacidade - aula.vagasDisponiveis;
+  const visiveis = Math.min(aula.capacidade, 24);
+  return Array.from({ length: visiveis },
+    (_, i) => `<i${i < ocupadas ? ' class="ocupada"' : ''}></i>`).join('');
+}
+
 const empresaAtual = () => estado.empresas.find(e => e.id === empresaId) || estado.empresas[0];
 const estabelecimentoAtual = () =>
   estado.estabelecimentos.find(e => e.id === estabelecimentoId) || estado.estabelecimentos[0];
@@ -110,6 +128,7 @@ function renderAdmin() {
           <div class="item-corpo">
             <div class="item-nome">${e.nome}</div>
             <div class="item-detalhe">${e.tipo} · ${moeda(e.valorPorCheckIn)} por check-in</div>
+            <div class="item-detalhe">${e.endereco}</div>
           </div>
           ${selo(rotulo, classe)}
           ${botao}
@@ -136,8 +155,22 @@ function renderAdmin() {
         <div class="plano-valor">${moeda(p.valorMensal)} <small>por mês</small></div>
         <div class="plano-detalhe">${p.limiteAulasMes} aulas por mês</div>
         <div class="plano-detalhe">${p.permiteDependentes ? 'Aceita dependentes' : 'Sem dependentes'}</div>
+        <div class="plano-cobre">${p.cobertura.length
+          ? p.cobertura.map(c => `<div>${c.estabelecimento}${
+              c.modalidades.length ? ': ' + c.modalidades.join(', ') : ''}${
+              c.estabelecimentoLiberado ? '' : ' (estabelecimento não liberado)'}</div>`).join('')
+          : '<p class="vazio">Não cobre nenhum estabelecimento</p>'}</div>
       </div>`).join('')
     : '<p class="vazio">Nenhum plano configurado. Sem plano não é possível incluir beneficiários.</p>';
+
+  preencherSelect($('#cob-plano'), estado.planos, p => p.nome, coberturaPlanoId);
+  preencherSelect($('#cob-estabelecimento'), estado.estabelecimentos,
+    e => e.nome, coberturaEstabelecimentoId);
+  const estCob = estado.estabelecimentos.find(e => e.id === coberturaEstabelecimentoId)
+    || estado.estabelecimentos[0];
+  $('#cob-modalidade').innerHTML = '<option value="">Acesso ao estabelecimento</option>'
+    + (estCob ? estCob.modalidades.map(m =>
+        `<option value="${m.id}">Modalidade ${m.nome}</option>`).join('') : '');
 }
 
 /* ---------- HU2: empresa ---------- */
@@ -233,14 +266,13 @@ function renderGrade() {
 
   $('#lista-aulas').innerHTML = aulas.length
     ? aulas.map(aula => {
-        const vagas = Array.from({ length: Math.min(aula.capacidade, 24) },
-          () => '<i></i>').join('');
-        const excedente = aula.capacidade > 24 ? ` e mais ${aula.capacidade - 24}` : '';
+        const reservadas = aula.capacidade - aula.vagasDisponiveis;
+        const excedente = aula.capacidade > 24 ? ` (mostrando 24)` : '';
         return `<article class="aula${aula.cancelada ? ' cancelada' : ''}">
           <div class="aula-quando">${aula.inicioLegivel}</div>
           <div class="aula-modalidade">${aula.modalidade} com ${aula.instrutor} · ${aula.duracaoMin} min</div>
-          <div class="vagas" aria-hidden="true">${vagas}</div>
-          <div class="vagas-nota">${aula.capacidade} vagas${excedente}${aula.cancelada ? ' · aula cancelada' : ''}</div>
+          <div class="vagas" aria-hidden="true">${barraDeVagas(aula)}</div>
+          <div class="vagas-nota">${reservadas} de ${aula.capacidade} vagas reservadas${excedente}${aula.cancelada ? ' · aula cancelada' : ''}</div>
           <div class="aula-acoes">
             <button class="acao discreta" data-instrutor-aula="${aula.id}">Trocar professor</button>
             <button class="acao discreta" data-capacidade="${aula.id}">Mudar vagas</button>
@@ -251,11 +283,92 @@ function renderGrade() {
     : '<p class="vazio">Nenhuma aula na grade deste estabelecimento.</p>';
 }
 
+/* ---------- UC03 e UC04a: aluno ---------- */
+
+const alunoAtual = () => estado.alunos.find(a => a.id === alunoId) || estado.alunos[0];
+const credenciados = () => estado.estabelecimentos.filter(e => e.situacao === 'APROVADO');
+const estabelecimentoDoCheckin = () =>
+  credenciados().find(e => e.id === checkinEstabelecimentoId) || credenciados()[0];
+
+function preencherCoordenadas(lat, lng) {
+  $('#checkin-lat').value = lat.toFixed(6);
+  $('#checkin-lng').value = lng.toFixed(6);
+}
+
+function renderAluno() {
+  preencherSelect($('#aluno-atual'), estado.alunos, a =>
+    `${a.nome}${a.tipo === 'Dependente' ? ' (dependente)' : ''} — ${a.plano || 'sem plano'}`,
+    alunoId);
+  const aluno = alunoAtual();
+  if (!aluno) return;
+
+  $('#indicadores-aluno').innerHTML = `
+    <div class="indicador">
+      <div class="indicador-valor">${aluno.plano || '—'}</div>
+      <div class="indicador-rotulo">plano${aluno.empresa ? ' concedido por ' + aluno.empresa : ''}</div>
+    </div>
+    <div class="indicador">
+      <div class="indicador-valor">${aluno.reservasNoMes} de ${aluno.limiteAulasMes}</div>
+      <div class="indicador-rotulo">aulas reservadas neste mês</div>
+    </div>
+    <div class="indicador">
+      <div class="indicador-valor">${aluno.elegivel ? 'Ativo' : 'Sem acesso'}</div>
+      <div class="indicador-rotulo">vínculo com o benefício</div>
+    </div>`;
+
+  /* check-in */
+  const meusCheckIns = estado.checkIns.filter(c => c.alunoId === aluno.id);
+  $('#cont-checkins').textContent = `${meusCheckIns.length} registrados`;
+  const deHoje = meusCheckIns.filter(c => c.hoje).pop();
+  $('#comprovante').innerHTML = deHoje
+    ? `<div class="comprovante">
+        <div class="comprovante-titulo">Check-in de hoje registrado</div>
+        <div class="comprovante-linha">${deHoje.estabelecimento}, ${deHoje.quando}</div>
+        <div class="comprovante-linha">Aguardando validação na recepção</div>
+      </div>`
+    : '<p class="vazio">Nenhum check-in hoje.</p>';
+
+  const lista = credenciados();
+  const est = estabelecimentoDoCheckin();
+  preencherSelect($('#checkin-estabelecimento'), lista, e => e.nome, est ? est.id : null);
+  if (est && coordenadasDe !== est.id) {
+    preencherCoordenadas(est.latitude, est.longitude);
+    coordenadasDe = est.id;
+  }
+
+  /* reservas */
+  const minhas = estado.reservas.filter(r => r.alunoId === aluno.id);
+  $('#cont-reservas').textContent = `${minhas.length} feitas`;
+  $('#lista-reservas').innerHTML = minhas.length
+    ? minhas.map(r => `<div class="item">
+        <div class="item-corpo">
+          <div class="item-nome">${r.aula}</div>
+          <div class="item-detalhe">${r.quando} · reservada ${r.feitaEm}</div>
+        </div>
+        ${selo('Confirmada', 'aprovado')}
+      </div>`).join('')
+    : '<p class="vazio">Nenhuma reserva. Escolha uma aula abaixo.</p>';
+
+  const abertas = estado.aulas.filter(a => !a.cancelada && !a.jaComecou);
+  $('#aulas-reserva').innerHTML = abertas.length
+    ? abertas.map(a => `<article class="aula">
+        <div class="aula-quando">${a.inicioLegivel}</div>
+        <div class="aula-modalidade">${a.modalidade} em ${a.estabelecimento}, com ${a.instrutor} · ${a.duracaoMin} min</div>
+        <div class="vagas" aria-hidden="true">${barraDeVagas(a)}</div>
+        <div class="vagas-nota">${a.vagasDisponiveis} de ${a.capacidade} vagas livres</div>
+        <div class="aula-acoes">
+          <button class="acao discreta" data-reservar="${a.id}">Reservar vaga</button>
+        </div>
+      </article>`).join('')
+    : '<p class="vazio">Nenhuma aula aberta na rede.</p>';
+}
+
 const vistas = {
   admin: { render: renderAdmin, contexto: 'Administração da plataforma' },
   empresa: { render: renderEmpresa, contexto: 'Visão da empresa contratante' },
   estabelecimento: { render: renderEstabelecimento, contexto: 'Visão do estabelecimento parceiro' },
-  grade: { render: renderGrade, contexto: 'Grade de aulas do estabelecimento' }
+  grade: { render: renderGrade, contexto: 'Grade de aulas do estabelecimento' },
+  aluno: { render: renderAluno, contexto: 'Visão do aluno' }
 };
 
 function render() {
@@ -286,7 +399,14 @@ $('#form-estabelecimento').addEventListener('submit', ev => {
   executar(() => api('/estabelecimentos', 'POST', {
     nome,
     tipo: $('#est-tipo').value,
-    valorPorCheckIn: parseFloat($('#est-valor').value)
+    valorPorCheckIn: parseFloat($('#est-valor').value),
+    logradouro: $('#est-logradouro').value.trim(),
+    numero: $('#est-numero').value.trim(),
+    bairro: $('#est-bairro').value.trim(),
+    cidade: $('#est-cidade').value.trim(),
+    cep: $('#est-cep').value.trim(),
+    latitude: parseFloat($('#est-lat').value),
+    longitude: parseFloat($('#est-lng').value)
   }).then(() => ev.target.reset()),
   `${nome} cadastrado. Aprove o credenciamento para ativar.`);
 });
@@ -313,6 +433,38 @@ $('#form-plano').addEventListener('submit', ev => {
     permiteDependentes: $('#plano-dep').checked
   }).then(() => ev.target.reset()),
   `Plano ${nome} criado e disponibilizado às empresas.`);
+});
+
+$('#cob-plano').addEventListener('change', ev => {
+  coberturaPlanoId = parseInt(ev.target.value);
+});
+
+$('#cob-estabelecimento').addEventListener('change', ev => {
+  coberturaEstabelecimentoId = parseInt(ev.target.value);
+  render();
+});
+
+$('#form-cobertura').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const plano = estado.planos.find(p => p.id === parseInt($('#cob-plano').value));
+  const est = estado.estabelecimentos.find(e => e.id === parseInt($('#cob-estabelecimento').value));
+  if (!plano || !est) {
+    avisar('Crie um plano e um estabelecimento antes de configurar a cobertura.', 'erro');
+    return;
+  }
+  coberturaPlanoId = plano.id;
+  coberturaEstabelecimentoId = est.id;
+  const valor = $('#cob-modalidade').value;
+
+  if (valor === '') {
+    executar(() => api(`/planos/${plano.id}/estabelecimentos`, 'POST',
+      { estabelecimentoId: est.id }), `${est.nome} liberado no plano ${plano.nome}.`);
+  } else {
+    const mod = est.modalidades.find(m => m.id === parseInt(valor));
+    executar(() => api(`/planos/${plano.id}/modalidades`, 'POST',
+      { estabelecimentoId: est.id, modalidadeId: mod.id }),
+      `${mod.nome} de ${est.nome} liberada no plano ${plano.nome}.`);
+  }
 });
 
 $('#vista-admin').addEventListener('click', ev => {
@@ -470,6 +622,70 @@ $('#vista-grade').addEventListener('click', ev => {
     if (!confirm('Cancelar esta aula?')) return;
     executar(() => api(`/aulas/${cancelar}/cancelar`, 'POST'), 'Aula cancelada.');
   }
+});
+
+/* --- UC03 e UC04a --- */
+
+$('#aluno-atual').addEventListener('change', ev => {
+  alunoId = parseInt(ev.target.value);
+  render();
+});
+
+$('#checkin-estabelecimento').addEventListener('change', ev => {
+  checkinEstabelecimentoId = parseInt(ev.target.value);
+  render();   // troca de estabelecimento recoloca as coordenadas da porta dele
+});
+
+$('#loc-porta').addEventListener('click', () => {
+  const est = estabelecimentoDoCheckin();
+  if (est) preencherCoordenadas(est.latitude, est.longitude);
+});
+
+$('#loc-longe').addEventListener('click', () => {
+  const est = estabelecimentoDoCheckin();
+  if (est) preencherCoordenadas(est.latitude + 0.009, est.longitude);   // ~1 km ao norte
+});
+
+/* Validar Localização do Dispositivo: no sistema web, quem fornece é o navegador. */
+$('#loc-navegador').addEventListener('click', () => {
+  if (!navigator.geolocation) {
+    avisar('Este navegador não fornece localização.', 'erro');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      preencherCoordenadas(pos.coords.latitude, pos.coords.longitude);
+      avisar('Localização do navegador obtida.');
+    },
+    erro => avisar(erro.code === erro.PERMISSION_DENIED
+      ? 'A permissão de localização é obrigatória para o check-in. Libere no navegador e tente de novo.'
+      : 'Não foi possível obter a localização do navegador.', 'erro'),
+    { enableHighAccuracy: true, timeout: 10000 });
+});
+
+$('#form-checkin').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const aluno = alunoAtual();
+  const est = estabelecimentoDoCheckin();
+  if (!aluno || !est) {
+    avisar('É preciso um aluno e um estabelecimento credenciado para fazer check-in.', 'erro');
+    return;
+  }
+  executar(() => api('/checkins', 'POST', {
+    alunoId: aluno.id,
+    estabelecimentoId: est.id,
+    latitude: parseFloat($('#checkin-lat').value),
+    longitude: parseFloat($('#checkin-lng').value)
+  }), `Check-in registrado em ${est.nome}.`);
+});
+
+$('#vista-aluno').addEventListener('click', ev => {
+  const { reservar } = ev.target.dataset;
+  if (reservar === undefined) return;
+  const aluno = alunoAtual();
+  const aula = estado.aulas.find(a => a.id === parseInt(reservar));
+  executar(() => api('/reservas', 'POST', { alunoId: aluno.id, aulaId: aula.id }),
+    `Vaga reservada: ${aula.modalidade}, ${aula.inicioLegivel}.`);
 });
 
 /* ---------- início ---------- */

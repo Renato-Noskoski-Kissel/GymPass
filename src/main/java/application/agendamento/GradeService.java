@@ -21,13 +21,13 @@ public class GradeService {
     public void agendar(int estabelecimentoId, int modalidadeId, int instrutorId,
                         String inicio, long duracaoMin, int capacidade) {
         Estabelecimento est = repositorio.getEstabelecimentos().get(estabelecimentoId);
-        repositorio.getAulas().add(new Aula(
+        Aula aula = est.agendarAula(
                 LocalDateTime.parse(inicio),
                 Duration.ofMinutes(duracaoMin),
                 capacidade,
-                est,
                 est.getModalidades().get(modalidadeId),
-                est.getInstrutores().get(instrutorId)));
+                est.getInstrutores().get(instrutorId));
+        repositorio.getAulas().add(aula);
     }
 
     public void trocarInstrutor(int aulaId, int instrutorId) {

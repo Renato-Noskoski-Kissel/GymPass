@@ -36,6 +36,7 @@ public class BeneficiariosService {
                 matricula, LocalDate.now(), empresa);
 
         repositorio.getAdesoes().add(Adesao.cadastrarBeneficiario(funcionario, plano));
+        repositorio.getAlunos().add(funcionario);
     }
 
     public void trocarPlano(int empresaId, int funcionarioId, int planoId) {
@@ -53,6 +54,7 @@ public class BeneficiariosService {
                 grauParentesco, responsavel);
 
         repositorio.getAdesoes().add(adesao.incluirDependente(dependente));
+        repositorio.getAlunos().add(dependente);
     }
 
     public void removerFuncionario(int empresaId, int funcionarioId) {

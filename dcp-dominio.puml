@@ -1,0 +1,504 @@
+@startuml
+skinparam dpi 150
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam nodesep 45
+skinparam ranksep 70
+hide circle
+title Diagrama de Classes de Projeto — Camada de Domínio
+
+' =====================================================================
+' FACHADA
+' =====================================================================
+class Plataforma <<fachada>> {
+  -empresas : List<Empresa>
+  -estabelecimentos : List<Estabelecimento>
+  -alunos : List<Aluno>
+  -reservas : List<Reserva>
+  -planos : List<Plano>
+  -adesoes : List<Adesao>
+  -aulas : List<Aula>
+  -checkIns : List<CheckIn>
+  -faturas : List<Fatura>
+  -repasses : List<Repasse>
+  -relatorios : List<RelatorioEngajamento>
+  -notificacoes : List<Notificacao>
+  .. Plano ..
+  +incluirFuncionario(empresaId : int, nome : String, matricula : String, planoId : int) : void
+  +incluirDependente(empresaId : int, funcionarioId : int, nome : String, grauParentesco : String) : void
+  +removerFuncionario(empresaId : int, funcionarioId : int) : void
+  +trocarPlano(empresaId : int, funcionarioId : int, planoId : int) : Adesao
+  -adesaoVigente(empresaId : int, funcionarioId : int) : Adesao
+  ''Falta Implementar/Validar : ..
+  +assinarPlano(alunoId : int, planoId : int) : Adesao
+  +cancelarAssinatura(alunoId : int) : void
+
+  .. Agendamento ..
+  +agendar(estabelecimentoId : int, modalidadeId : int, instrutorId : int, inicio : String, duracaoMin : long, capacidade : int) : void
+  +trocarInstrutor(aulaId : int, instrutorId : int) : void
+  +alterarCapacidade(aulaId : int, capacidade : int) : void
+  +cancelar(aulaId : int) : void
+  ''Falta implementar: ..
+  +reservarVaga(alunoId : int, aulaId : int) : Reserva
+  +cancelarReserva(alunoId : int, reservaId : int) : void
+  +consultarCalendario(alunoId : int) : List<Reserva>
+
+  .. Controle de Acesso ..
+  ''falta tudo 
+  +buscarEstabelecimentos(alunoId : int, latitude : double, longitude : double, raio : double, modalidade : String, tipo : String, dia : LocalDate, somenteCobertos : boolean) : List<Estabelecimento>
+  +realizarCheckIn(alunoId : int, aulaId : int, estabelecimentoId : int, latitude : double, longitude : double) : CheckIn
+  +validarCheckIn(codigo : String) : void
+
+  .. Gestão de Parceiros ..
+  ''EstabelecimentoService
+  +adicionarModalidade(estabelecimentoId : int, nome : String, descricao : String) : void
+  +removerModalidade(estabelecimentoId : int, modalidadeId : int) : void
+  +contratarInstrutor(estabelecimentoId : int, nome : String, registro : String, especialidade : String) : void
+  +desligarInstrutor(estabelecimentoId : int, instrutorId : int) : void
+  ''GestaoParceirosService
+  +cadastrarEstabelecimento(nome : String, tipo : String, valorPorCheckIn : double) : void
+  +aprovarCredenciamento(estabelecimentoId : int) : void
+  +suspenderCredenciamento(estabelecimentoId : int) : void
+  +contratarEmpresa(razaoSocial : String, limiteDependentes : int, diaVencimento : int) : void
+  +criarPlano(nome : String, nivel : int, valorMensal : double, limiteAulasMes : int, permiteDependentes : boolean) : void
+  +oferecerPlano(empresaId : int, planoId : int) : void
+  +liberarEstabelecimento(planoId : int, estabelecimentoId : int) : void
+  +liberarModalidade(planoId : int, estabelecimentoId : int, modalidadeId : int) : void
+
+  .. Análise ..
+  ''Falta e nao será feito, apenas planejado
+  +consultarRelatorio(empresaId : int, mes : YearMonth) : RelatorioEngajamento
+  +consultarExtrato(estabelecimentoId : int, mes : YearMonth) : Repasse
+  +recomendarAulas(alunoId : int) : List<Aula>
+
+  .. Rotinas de Sistema ..
+  ''Falta e nao será feito, apenas planejado
+  +processarFechamentoMensal(mes : YearMonth) : void
+  +dispararNotificacoes() : void
+}
+
+' =====================================================================
+' PLANOS E ADESÃO
+' =====================================================================
+package "Planos e Adesão" {
+  class Plano {
+    -nome : String
+    -nivel : int
+    -valorMensal : double
+    -limiteAulasMes : int
+    -permiteDependentes : boolean
+    -empresasQueOferecem : List<Empresa>
+    -estabelecimentosLiberados : List<Estabelecimento> ''n tem no codigo ainda
+    -modalidadesLiberadas : List<Modalidade> ''n tem no codigo ainda
+    +getNome() : String
+    +getNivel() : int
+    +getValorMensal() : double
+    +getLimiteAulasMes() : int
+    +permiteDependentes() : boolean
+    +oferecerPara(e : Empresa) : void
+    +ehOferecidoPor(e : Empresa) : boolean
+    ''Falta:
+    +libera(e : Estabelecimento) : boolean
+    +libera(m : Modalidade) : boolean
+    +liberar(e : Estabelecimento) : void
+    +liberar(m : Modalidade) : void
+    +getEmpresasQueOferecem() : List<Empresa>
+    +getEstabelecimentosLiberados() : List<Estabelecimento>
+    +getModalidadesLiberadas() : List<Modalidade>
+  }
+
+  class Adesao {
+    -aluno : Aluno
+    -plano : Plano
+    -dataInicio : LocalDate
+    -dataFim : LocalDate
+    -situacao : SituacaoAdesao
+    {static} +cadastrarBeneficiario(f : Funcionario, p : Plano) : Adesao
+    {static} +trocarPlano(atual : Adesao, novo : Plano) : Adesao
+    +incluirDependente(d : Dependente) : Adesao
+    +estaAtiva() : boolean
+    +encerrar() : void
+    +suspender() : void
+    +reativar() : void
+    +getAluno() : Aluno
+    +getPlano() : Plano
+    +getDataInicio() : LocalDate
+    +getDataFim() : LocalDate
+    +getSituacao() : SituacaoAdesao
+    ''Falta:
+    +registrarCheckIn(e : Estabelecimento, lat : double, lng : double, ultimo : CheckIn) : CheckIn
+    +reservarVaga(a : Aula, reservasMes : int) : Reserva
+  }
+}
+
+' =====================================================================
+' CADASTRO E REDE
+' =====================================================================
+package "Cadastro e Rede" {
+  class Empresa {
+    -razaoSocial : String
+    -cnpj : String
+    -dataContrato : LocalDate
+    -limiteDependentes : int
+    -diaVencimentoFatura : int
+    -funcionarios : List<Funcionario>
+    +incluirFuncionario(f : Funcionario) : void
+    +removerFuncionario(f : Funcionario) : void
+    +getTotalFuncionarios() : int
+    +getTotalDependentes() : int
+    +getTotalBeneficiarios() : int
+    +possuiFuncionario(f : Funcionario): boolean
+    +getFuncionarios() : List<Funcionario>
+    +getRazaoSocial() : String
+    +getCnpj() : String
+    +getDataContrato() : LocalDate
+    +getLimiteDependentes() : int
+    +getDiaVencimentoFatura() : int
+    ''Falta:
+    +bloquearBeneficiarios() : void
+    +desbloquearBeneficiarios() : void
+  }
+
+  abstract class Aluno {
+    -nome : String
+    -cpf : String
+    -email : String
+    -dataCadastro : LocalDate
+    -situacao : SituacaoAluno
+    +estaAtivo() : boolean
+    +bloquear() : void
+    +reativar() : void
+    +inativar() : void
+    {abstract} +ehElegivel() : boolean
+    {abstract} +getEmpresaVinculada() : Empresa
+    +getNome() : String
+    +getCpf() : String
+    +getEmail() : String
+    +getDataCadastro() : LocalDate
+    +getSituacao() : SituacaoAluno
+  }
+
+  together {
+    class Funcionario {
+      -matricula : String
+      -dataAdmissao : LocalDate
+      -empresa : Empresa
+      -dependentes : List<Dependente>
+      +ehElegivel() : boolean
+      ~desvincular() : void
+      +vincularDependente(d : Dependente) : void
+      +removerDependente(d : Dependente) : void
+      +getDependentes() : List<Dependente>
+      +getMatricula() : String
+      +getDataAdmissao() : LocalDate
+      +getEmpresaVinculada() : Empresa
+    }
+
+    class Dependente {
+      -grauParentesco : String
+      -responsavel : Funcionario
+      +ehElegivel() : boolean
+      +getGrauParentesco() : String
+      +getResponsavel() : Funcionario
+      +getEmpresaVinculada() : Empresa
+    }
+  }
+
+  abstract class Estabelecimento {
+    -nomeFantasia : String
+    -cnpj : String
+    -situacaoCredenciamento : SituacaoCredenciamento
+    -valorPorCheckIn : double
+    -endereco : Endereco ''n tem no codigo ainda
+    -aulas : List<Aula> ''n ta implementado
+    -modalidades : List<Modalidade>
+    -instrutores : List<Instrutor>
+    +aprovarCredenciamento() : void
+    +suspenderCredenciamento() : void
+    +estaCredenciado() : boolean
+    +adicionarModalidade(nome : String, descricao : String) : Modalidade
+    +removerModalidade(m : Modalidade) : void
+    +oferece(m : Modalidade) : boolean
+    +contratarInstrutor(nome : String, registro : String, especialidade : String) : Instrutor
+    +desligarInstrutor(i : Instrutor) : void
+    +getNomeFantasia() : String
+    +getCnpj() : String
+    +getValorPorCheckIn() : double
+    +getSituacaoCredenciamento() : SituacaoCredenciamento
+    +getModalidades() : List<Modalidade>
+    +getInstrutores() : List<Instrutor>
+    ''Falta:
+    +estaNoRaio(lat : double, lng : double) : boolean
+    +getEndereco() : Endereco
+    +agendarAula(inicio : LocalDateTime, duracao : Duration, capacidade : int, m : Modalidade, i : Instrutor) : Aula
+    +getAulas() : List<Aula>
+  }
+
+  together {
+    class Academia {
+      -funciona24Horas : boolean
+      +isFunciona24Horas() : boolean
+    }
+    class Estudio {
+      -capacidadePadraoTurma : int
+      +getCapacidadePadraoTurma() : int
+    }
+    class Quadra {
+      -coberta : boolean
+      +isCoberta() : boolean
+    }
+  }
+  
+  ''Falta a classe endereço na implementação!
+  class Endereco {
+    -logradouro : String
+    -numero : String
+    -bairro : String
+    -cidade : String
+    -cep : String
+    -latitude : double
+    -longitude : double
+    +distanciaAte(lat : double, lng : double) : double
+    +getLogradouro() : String
+    +getNumero() : String
+    +getBairro() : String
+    +getCidade() : String
+    +getCep() : String
+    +getLatitude() : double
+    +getLongitude() : double
+  }
+
+  class Modalidade {
+    -nome : String
+    -descricao : String
+    +getNome() : String
+    +getDescricao() : String
+  }
+
+  class Instrutor {
+    -nome : String
+    -registro : String
+    -especialidade : String
+    -estabelecimento : Estabelecimento
+    +getNome() : String
+    +getRegistro() : String
+    +getEspecialidade() : String
+    +getEstabelecimento() : Estabelecimento
+    +trabalhaEm(e : Estabelecimento) : boolean
+  }
+}
+
+' =====================================================================
+' ACESSO E AGENDA
+' =====================================================================
+package "Acesso e Agenda" {
+  class Aula {
+    -dataHoraInicio : LocalDateTime
+    -duracao : Duration
+    -capacidadeMaxima : int
+    -cancelada : boolean
+    -estabelecimento : Estabelecimento
+    -modalidade : Modalidade
+    -instrutor : Instrutor
+    -reservas : List<Reserva> ''n tem no codigo ainda
+    {static}-validar(inicio : LocalDateTime, capacidade : int, e : Estabelecimento, m : Modalidade, i : Instrutor) : void
+    +atribuirInstrutor(i : Instrutor) : void
+    +alterarCapacidade(c : int) : void
+    +reagendar(inicio : LocalDateTime, d : Duration) : void
+    +cancelar() : void
+    +estaCancelada() : boolean
+    +jaComecou() : boolean
+    +getCapacidadeMaxima() : int
+    +getDataHoraInicio() : LocalDateTime
+    +getDuracao() : Duration
+    +getEstabelecimento() : Estabelecimento
+    +getModalidade() : Modalidade
+    +getInstrutor() : Instrutor
+    ''Fazer no codigo
+    +reservar(al : Aluno) : Reserva
+    +getReservas() : List<Reserva>
+    +vagasDisponiveis() : int
+  }
+
+  ''falta no codigo
+  class Reserva {
+    -dataHoraReserva : LocalDateTime
+    -situacao : SituacaoReserva
+    -penalizada : boolean
+    -aluno : Aluno
+    -aula : Aula
+    +cancelar(momento : LocalDateTime) : void
+    +marcarUtilizada() : void
+    +getDataHoraReserva() : LocalDateTime
+    +getSituacao() : SituacaoReserva
+    +isPenalizada() : boolean
+    +getAluno() : Aluno
+    +getAula() : Aula
+    +registrarFalta() : void
+  }
+
+   ''Falta no codigo:
+  class CheckIn {
+    -dataHora : LocalDateTime
+    -latitudeOrigem : double
+    -longitudeOrigem : double
+    -situacaoValidacao : SituacaoCheckIn
+    -codigo : String
+    -aluno : Aluno
+    -aula : Aula
+    -estabelecimento : Estabelecimento
+    +validar() : void
+    +recusar(motivo : String) : void
+    +expirou(momento : LocalDateTime) : boolean
+    -motivoRecusa : String
+    +getDataHora() : LocalDateTime
+    +getLatitudeOrigem() : double
+    +getLongitudeOrigem() : double
+    +getSituacaoValidacao() : SituacaoCheckIn
+    +getCodigo() : String
+    +getAluno() : Aluno
+    +getAula() : Aula
+    +getEstabelecimento() : Estabelecimento
+    +expirar() : void
+  }
+
+   ''Falta no codigo:
+  class RelatorioEngajamento {
+    -mesReferencia : YearMonth
+    -taxaAdesao : double
+    -totalCheckIns : int
+    -mediaCheckInsPorFuncionario : double
+    -empresa : Empresa
+    {static} +gerar(e : Empresa, adesoes : List<Adesao>, checkIns : List<CheckIn>, mes : YearMonth) : RelatorioEngajamento
+    +getMesReferencia() : YearMonth
+    +getTaxaAdesao() : double
+    +getTotalCheckIns() : int
+    +getMediaCheckInsPorFuncionario() : double
+    +getEmpresa() : Empresa
+  }
+}
+ ''Falta no codigo
+' =====================================================================
+' FINANCEIRO
+' =====================================================================
+package "Financeiro" {
+  class Fatura {
+    -mesReferencia : YearMonth
+    -valorTotal : double
+    -dataVencimento : LocalDate
+    -situacao : SituacaoFatura
+    -empresa : Empresa
+    +estaEmAtraso(hoje : LocalDate, tolerancia : int) : boolean
+    -dataPagamento : LocalDate
+    {static} +gerar(e : Empresa, adesoes : List<Adesao>, mes : YearMonth) : Fatura
+    +registrarPagamento(data : LocalDate) : void
+    +getMesReferencia() : YearMonth
+    +getValorTotal() : double
+    +getDataVencimento() : LocalDate
+    +getSituacao() : SituacaoFatura
+    +getEmpresa() : Empresa
+  }
+
+  class Repasse {
+    -mesReferencia : YearMonth
+    -quantidadeCheckIns : int
+    -valorTotal : double
+    -estabelecimento : Estabelecimento
+    -checkins : List<CheckIn>
+    {static} +gerar(e : Estabelecimento, checkIns : List<CheckIn>, mes : YearMonth) : Repasse
+    +getMesReferencia() : YearMonth
+    +getQuantidadeCheckIns() : int
+    +getValorTotal() : double
+    +getEstabelecimento() : Estabelecimento
+    +getCheckIns() : List<CheckIn>
+  }
+}
+
+ ''Falta VERIFICAR metodos e variaveis:
+' =====================================================================
+' NOTIFICAÇÕES
+' =====================================================================
+package "Notificações" {
+  class Notificacao {
+    -tipo : TipoNotificacao
+    -mensagem : String
+    -dataEnvio : LocalDateTime
+    -lida : boolean
+    -aluno : Aluno
+    +marcarComoLida() : void
+    +enviar() : void
+    +foiEnviada() : boolean
+    +getTipo() : TipoNotificacao
+    +getMensagem() : String
+    +getDataEnvio() : LocalDateTime
+    +isLida() : boolean
+    +getAluno() : Aluno
+  }
+}
+
+' =====================================================================
+' FACHADA -> RAÍZES (visibilidade de atributo)
+' =====================================================================
+Plataforma "1" --> "0..*" Empresa
+Plataforma "1" --> "0..*" Estabelecimento
+Plataforma "1" --> "0..*" Plano
+Plataforma "1" --> "0..*" Adesao
+Plataforma "1" --> "0..*" Aula
+Plataforma "1" --> "0..*" CheckIn
+Plataforma "1" --> "0..*" Fatura
+Plataforma "1" --> "0..*" Repasse
+Plataforma "1" --> "0..*" RelatorioEngajamento
+Plataforma "1" --> "0..*" Notificacao
+Plataforma "1" --> "0..*" Aluno
+Plataforma "1" --> "0..*" Reserva
+
+
+' =====================================================================
+' HERANÇAS
+' =====================================================================
+Aluno <|-- Funcionario
+Aluno <|-- Dependente
+Estabelecimento <|-- Academia
+Estabelecimento <|-- Estudio
+Estabelecimento <|-- Quadra
+
+' =====================================================================
+' CADASTRO E REDE
+' =====================================================================
+Empresa "1" <--> "0..*" Funcionario : emprega >
+Funcionario "1" <--> "0..*" Dependente : responsável-por >
+Estabelecimento "1" *--> "1" Endereco : localiza-se-em >
+Estabelecimento "1" *--> "0..*" Modalidade : oferece >
+Estabelecimento "1" <--> "0..*" Instrutor : contrata >
+
+' =====================================================================
+' PLANOS E ADESÃO
+' =====================================================================
+Adesao "1..*" --> "1" Aluno : concedida-a >
+Adesao "0..*" --> "1" Plano : refere-se-a >
+Plano "0..*" --> "0..*" Empresa : oferecido-por >
+Plano "1..*" --> "1..*" Estabelecimento : libera >
+Plano "1..*" --> "1..*" Modalidade : libera >
+
+' =====================================================================
+' ACESSO E AGENDA
+' =====================================================================
+Estabelecimento "1" *--> "0..*" Aula : sedia >
+Aula "0..*" --> "1" Modalidade : classificada-por >
+Aula "0..*" --> "1" Instrutor : ministrada-por >
+Aula "1" *--> "0..*" Reserva : recebe >
+Reserva "0..*" --> "1" Aluno : feita-por >
+CheckIn "0..*" --> "1" Aluno : realizado-por >
+CheckIn "0..*" --> "1" Estabelecimento : recebido-por >
+CheckIn "0..*" --> "0..1" Aula : referente-a >
+
+' =====================================================================
+' FINANCEIRO, ANÁLISE, NOTIFICAÇÕES
+' =====================================================================
+Fatura "0..*" --> "1" Empresa : cobrada-de >
+Repasse "0..*" --> "1" Estabelecimento : destinado-a >
+Repasse "0..1" --> "1..*" CheckIn : consolida >
+RelatorioEngajamento "0..*" --> "1" Empresa : destinado-a >
+Notificacao "0..*" --> "1" Aluno : destinada-a >
+@enduml

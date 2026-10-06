@@ -1,5 +1,7 @@
 import dominio.RegraDeNegocioException;
 import dominio.acessoAgenda.Aula;
+import dominio.acessoAgenda.CheckIn;
+import dominio.acessoAgenda.Reserva;
 import dominio.cadastroRede.*;
 import dominio.planosAdesao.*;
 
@@ -7,7 +9,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/** Teste manual do domínio da Iteração 1. Não faz parte da camada de domínio. */
+/** Teste manual do domínio (iterações 1 e 2). Não faz parte da camada de domínio. */
 public class Main {
 
     public static void main(String[] args) {
@@ -16,7 +18,10 @@ public class Main {
         Empresa empresa = new Empresa("Tech Ltda", "11.111.111/0001-11",
                 LocalDate.of(2026, 1, 10), 2, 10);
 
-        Estudio estudio = new Estudio("Studio Movimento", "22.222.222/0001-22", 12.50, 15);
+        Endereco endStudio = new Endereco("Rua Lauro Linhares", "1200", "Trindade",
+                "Florianópolis", "88036-002", -27.5893, -48.5196);
+        Estudio estudio = new Estudio("Studio Movimento", "22.222.222/0001-22", 12.50,
+                endStudio, 15);
         estudio.aprovarCredenciamento();
         System.out.println("Credenciado? " + estudio.estaCredenciado());
 
@@ -55,17 +60,16 @@ public class Main {
         System.out.println("Beneficiarios (func + dep): " + empresa.getTotalBeneficiarios());
 
         // RN3 - plano Basico nao permite dependentes
-        Dependente filhoBruno = new Dependente("Nina", "333.333.333-33", "nina@mail.com",
-                "Filha", bruno);
-        try {
-            adesaoBruno.incluirDependente(filhoBruno);
-        } catch (RegraDeNegocioException e) {
-            System.out.println("Bloqueado (RN3): " + e.getMessage());
-        }
+        Funcionario carla = new Funcionario("Carla", "444.444.444-44", "carla@tech.com",
+                "F-003", LocalDate.of(2025, 6, 2), empresa);
+        Adesao adesaoCarla = Adesao.cadastrarBeneficiario(carla, basico);
+        Dependente filhaCarla = new Dependente("Nina", "333.333.333-33", "nina@mail.com",
+                "Filha", carla);
+        tentar("RN3", () -> adesaoCarla.incluirDependente(filhaCarla));
 
         // ===== HU1 - estudio gerencia aulas =====
-        Aula aula = new Aula(LocalDateTime.now().plusDays(2),
-                Duration.ofMinutes(50), 10, estudio, pilates, ana);
+        Aula aula = estudio.agendarAula(LocalDateTime.now().plusDays(2),
+                Duration.ofMinutes(50), 10, pilates, ana);
         System.out.println("Aula criada: " + aula);
 
         aula.atribuirInstrutor(caio);
@@ -75,13 +79,71 @@ public class Main {
         System.out.println("Capacidade: " + aula.getCapacidadeMaxima());
 
         // HU1 - instrutor de outro estabelecimento nao pode ser atribuido
-        Academia outra = new Academia("Academia Forte", "44.444.444/0001-44", 9.90, true);
-        Instrutor externo = outra.contratarInstrutor("Rui", "CREF-9999", "Musculacao");
-        try {
-            aula.atribuirInstrutor(externo);
-        } catch (RegraDeNegocioException e) {
-            System.out.println("Bloqueado (instrutor externo): " + e.getMessage());
-        }
+        Endereco endForte = new Endereco("Rua Deputado Antônio Edu Vieira", "800", "Pantanal",
+                "Florianópolis", "88040-001", -27.6036, -48.5210);
+        Academia forte = new Academia("Academia Forte", "44.444.444/0001-44", 9.90, endForte, true);
+        forte.aprovarCredenciamento();
+        Instrutor externo = forte.contratarInstrutor("Rui", "CREF-9999", "Musculacao");
+        tentar("instrutor externo", () -> aula.atribuirInstrutor(externo));
+
+        // ===== RF5 - cobertura dos planos =====
+        premium.liberar(estudio);
+        premium.liberar(pilates);
+        premium.liberar(forte);
+        basico.liberar(forte);
+        System.out.println("Premium cobre o Studio? " + premium.libera(estudio));
+        System.out.println("Basico cobre o Studio? " + basico.libera(estudio));
+
+        double latPorta = endStudio.getLatitude();
+        double lngPorta = endStudio.getLongitude();
+
+        // ===== UC03 - Realizar Check-in =====
+        CheckIn checkInLara = adesaoLara.registrarCheckIn(estudio, latPorta, lngPorta, null);
+        System.out.println("Check-in: " + checkInLara);
+
+        // RN2 - segundo check-in no mesmo dia
+        tentar("RN2", () -> adesaoLara.registrarCheckIn(forte,
+                endForte.getLatitude(), endForte.getLongitude(), checkInLara));
+
+        // RN4 - cerca de 1 km ao norte do estudio
+        tentar("RN4", () -> adesaoMiguel.registrarCheckIn(estudio,
+                latPorta + 0.009, lngPorta, null));
+
+        // RF5 - plano Basico nao cobre o estudio
+        tentar("RF5 check-in", () -> adesaoCarla.registrarCheckIn(estudio,
+                latPorta, lngPorta, null));
+
+        // Basico cobre a academia
+        System.out.println("Check-in: " + adesaoCarla.registrarCheckIn(forte,
+                endForte.getLatitude(), endForte.getLongitude(), null));
+
+        // ===== UC04a - Reservar Vaga em Aula =====
+        Aula turmaPequena = estudio.agendarAula(LocalDateTime.now().plusDays(1),
+                Duration.ofMinutes(50), 1, pilates, ana);
+        Reserva reserva = adesaoLara.reservarVaga(turmaPequena, 0);
+        System.out.println(reserva);
+        System.out.println("Vagas livres: " + turmaPequena.vagasDisponiveis());
+
+        // 3a - aula lotada
+        tentar("lotada", () -> adesaoMiguel.reservarVaga(turmaPequena, 0));
+
+        // limite mensal - o servico passa quantas reservas o aluno ja fez no mes
+        tentar("limite mensal", () -> adesaoMiguel.reservarVaga(aula,
+                premium.getLimiteAulasMes()));
+
+        // RF5 - plano Basico nao cobre o estudio
+        tentar("RF5 reserva", () -> adesaoCarla.reservarVaga(aula, 0));
+
+        // capacidade nao pode ficar abaixo das vagas reservadas
+        adesaoMiguel.reservarVaga(aula, 0);
+        adesaoBruno.reservarVaga(aula, 0);
+        tentar("capacidade", () -> aula.alterarCapacidade(1));
+
+        // aula cancelada nao recebe reserva
+        Aula cancelada = estudio.agendarAula(LocalDateTime.now().plusDays(3),
+                Duration.ofMinutes(50), 5, pilates, ana);
+        cancelada.cancelar();
+        tentar("cancelada", () -> adesaoLara.reservarVaga(cancelada, 1));
 
         // ===== HU2 - remocao do quadro derruba a elegibilidade em cascata (RN1) =====
         empresa.removerFuncionario(lara);
@@ -90,5 +152,18 @@ public class Main {
         System.out.println("Miguel elegivel? " + miguel.ehElegivel());
         System.out.println("Adesao da Lara ativa? " + adesaoLara.estaAtiva());
         System.out.println("Adesao do Miguel ativa? " + adesaoMiguel.estaAtiva());
+
+        tentar("RN1 check-in", () -> adesaoMiguel.registrarCheckIn(estudio,
+                latPorta, lngPorta, null));
+        tentar("RN1 reserva", () -> adesaoLara.reservarVaga(aula, 1));
+    }
+
+    private static void tentar(String regra, Runnable acao) {
+        try {
+            acao.run();
+            System.out.println("ERRO: deveria ter bloqueado (" + regra + ")");
+        } catch (RegraDeNegocioException e) {
+            System.out.println("Bloqueado (" + regra + "): " + e.getMessage());
+        }
     }
 }

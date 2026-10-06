@@ -1,6 +1,8 @@
 package persistencia;
 
 import dominio.acessoAgenda.Aula;
+import dominio.acessoAgenda.CheckIn;
+import dominio.acessoAgenda.Reserva;
 import dominio.cadastroRede.*;
 import dominio.planosAdesao.Adesao;
 import dominio.planosAdesao.Plano;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,6 +31,9 @@ public class Repositorio {
     private final List<Plano> planos = new ArrayList<>();
     private final List<Aula> aulas = new ArrayList<>();
     private final List<Adesao> adesoes = new ArrayList<>();
+    private final List<Aluno> alunos = new ArrayList<>();
+    private final List<Reserva> reservas = new ArrayList<>();
+    private final List<CheckIn> checkIns = new ArrayList<>();
 
     public Repositorio() { semear(); }
 
@@ -36,6 +42,9 @@ public class Repositorio {
     public List<Plano> getPlanos() { return planos; }
     public List<Aula> getAulas() { return aulas; }
     public List<Adesao> getAdesoes() { return adesoes; }
+    public List<Aluno> getAlunos() { return alunos; }
+    public List<Reserva> getReservas() { return reservas; }
+    public List<CheckIn> getCheckIns() { return checkIns; }
 
     /** Adesão vigente de um aluno, ou null se não houver. */
     public Adesao adesaoDe(Aluno aluno) {
@@ -43,6 +52,35 @@ public class Repositorio {
             .filter(a -> a.getAluno() == aluno)
             .filter(a -> a.getSituacao() != SituacaoAdesao.ENCERRADA)
             .findFirst().orElse(null);
+    }
+
+    /**
+     * UC03 - check-in mais recente do aluno, ou null se nunca fez nenhum.
+     * Se ele é de hoje ou não, quem decide é Adesao.registrarCheckIn (RN2).
+     */
+    public CheckIn ultimoCheckInDe(Aluno aluno) {
+        CheckIn ultimo = null;
+        for (CheckIn c : checkIns) {
+            if (c.getAluno() == aluno) {
+                ultimo = c;   // a lista está em ordem de registro
+            }
+        }
+        return ultimo;
+    }
+
+    /**
+     * UC04a - reservas que o aluno fez no mês informado.
+     * Conta pela data em que a reserva foi feita, não pela data da aula.
+     */
+    public int totalReservasNoMes(Aluno aluno, YearMonth mes) {
+        int total = 0;
+        for (Reserva r : reservas) {
+            if (r.getAluno() == aluno
+                    && YearMonth.from(r.getDataHoraReserva()).equals(mes)) {
+                total++;
+            }
+        }
+        return total;
     }
 
     private void semear() {
@@ -53,22 +91,30 @@ public class Repositorio {
         empresas.add(tech);
         empresas.add(norte);
 
-        Estudio studio = new Estudio("Studio Movimento", "22.222.222/0001-22", 12.5, 15);
+        Estudio studio = new Estudio("Studio Movimento", "22.222.222/0001-22", 12.5,
+                new Endereco("Rua Lauro Linhares", "1200", "Trindade", "Florianópolis",
+                        "88036-002", -27.5893, -48.5196), 15);
         studio.aprovarCredenciamento();
-        Academia forte = new Academia("Academia Forte", "44.444.444/0001-44", 9.9, true);
+        Academia forte = new Academia("Academia Forte", "44.444.444/0001-44", 9.9,
+                new Endereco("Rua Deputado Antônio Edu Vieira", "800", "Pantanal",
+                        "Florianópolis", "88040-001", -27.6036, -48.5210), true);
         forte.aprovarCredenciamento();
-        Quadra areia = new Quadra("Quadra Areia", "55.555.555/0001-55", 15, false);
+        Quadra areia = new Quadra("Quadra Areia", "55.555.555/0001-55", 15,
+                new Endereco("Avenida das Rendeiras", "300", "Lagoa da Conceição",
+                        "Florianópolis", "88062-400", -27.6037, -48.4657), false);
         estabelecimentos.add(studio);
         estabelecimentos.add(forte);
         estabelecimentos.add(areia);
 
         Modalidade pilates = new Modalidade("Pilates", "Aulas em grupo com aparelhos");
+        Modalidade yoga = new Modalidade("Yoga", "Hatha e Vinyasa");
         studio.adicionarModalidade(pilates);
-        studio.adicionarModalidade(new Modalidade("Yoga", "Hatha e Vinyasa"));
+        studio.adicionarModalidade(yoga);
         Instrutor ana = studio.contratarInstrutor("Ana Reis", "CREF-1234", "Pilates");
-        studio.contratarInstrutor("Caio Melo", "CREF-5678", "Yoga");
+        Instrutor caio = studio.contratarInstrutor("Caio Melo", "CREF-5678", "Yoga");
 
-        forte.adicionarModalidade(new Modalidade("Musculacao", "Acesso livre a sala"));
+        Modalidade musculacao = new Modalidade("Musculacao", "Acesso livre a sala");
+        forte.adicionarModalidade(musculacao);
         forte.contratarInstrutor("Rui Barros", "CREF-9999", "Musculacao");
 
         Plano premium = new Plano("Premium", 3, 189.9, 8, true);
@@ -78,6 +124,14 @@ public class Repositorio {
             p.oferecerPara(norte);
             planos.add(p);
         }
+
+        // RF5 - Premium cobre o estúdio (só Pilates) e a academia; Basico só a academia.
+        premium.liberar(studio);
+        premium.liberar(pilates);
+        premium.liberar(forte);
+        premium.liberar(musculacao);
+        basico.liberar(forte);
+        basico.liberar(musculacao);
 
         Funcionario lara = new Funcionario("Lara Souza", "000.000.000-00", "lara@tech.com",
                 "F-001", LocalDate.of(2025, 3, 1), tech);
@@ -91,8 +145,14 @@ public class Repositorio {
                 "miguel@mail.com", "Filho", lara);
         adesoes.add(adLara.incluirDependente(miguel));
 
+        alunos.add(lara);
+        alunos.add(bruno);
+        alunos.add(miguel);
+
         LocalDateTime amanha = LocalDateTime.now().plusDays(1)
                 .withHour(7).withMinute(0).withSecond(0).withNano(0);
-        aulas.add(new Aula(amanha, Duration.ofMinutes(50), 8, studio, pilates, ana));
+        aulas.add(studio.agendarAula(amanha, Duration.ofMinutes(50), 8, pilates, ana));
+        aulas.add(studio.agendarAula(amanha.plusHours(11), Duration.ofMinutes(60), 2, pilates, ana));
+        aulas.add(studio.agendarAula(amanha.plusHours(12), Duration.ofMinutes(60), 10, yoga, caio));
     }
 }

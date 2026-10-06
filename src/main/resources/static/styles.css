@@ -245,6 +245,16 @@ body {
 
 .plano-detalhe { font-size: .82rem; color: var(--tinta-70); }
 
+.plano-cobre {
+  margin-top: .55rem;
+  padding-top: .5rem;
+  border-top: 1px dotted var(--linha);
+  font-size: .82rem;
+}
+
+.plano-cobre div + div { margin-top: .15rem; }
+.plano-cobre .vazio { padding: 0; font-size: .82rem; }
+
 /* ---------- indicadores ---------- */
 
 .indicadores {
@@ -308,6 +318,8 @@ body {
   border-radius: 1px;
 }
 
+.vagas i.ocupada { background: var(--verde); border-color: var(--verde); }
+
 .vagas-nota { font-size: .82rem; color: var(--tinta-70); }
 
 .aula-acoes {
@@ -338,6 +350,9 @@ body {
 
 .par { display: flex; gap: .7rem; }
 .par .campo { flex: 1; }
+.par .campo.estreito { flex: 0 1 96px; }
+
+.botoes { display: flex; flex-wrap: wrap; gap: .4rem; }
 
 .campo { display: flex; flex-direction: column; gap: .22rem; min-width: 0; }
 .formulario.linha .campo { flex: 1 1 150px; }
@@ -418,6 +433,21 @@ button:focus-visible {
   color: var(--tinta-40);
 }
 
+/* ---------- aluno: comprovante de check-in ---------- */
+
+.comprovante {
+  padding: .75rem .9rem;
+  background: #eaf4f0;
+  border: 1px solid #b6d4c8;
+  border-radius: var(--r);
+}
+
+.comprovante-titulo { font-weight: 600; color: var(--verde); }
+.comprovante-linha { font-size: .86rem; margin-top: .1rem; }
+
+.secao-cabeca { margin: .4rem 0 .8rem; }
+.secao-cabeca h2 { margin: 0; font-size: 1.02rem; font-weight: 600; }
+
 /* ---------- avisos ---------- */
 
 .avisos {
@@ -452,7 +482,8 @@ button:focus-visible {
 /* ---------- responsivo ---------- */
 
 @media (max-width: 760px) {
-  .quadro { grid-template-columns: 1fr; }
+  .quadro { grid-template-columns: minmax(0, 1fr); }
+  .seletor select { min-width: 0; flex: 1; }
 
   .perfis {
     position: static;
