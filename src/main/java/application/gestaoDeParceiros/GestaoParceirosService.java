@@ -46,8 +46,10 @@ public class GestaoParceirosService {
     }
 
     public void contratarEmpresa(String razaoSocial, int limiteDependentes, int diaVencimento) {
-        repositorio.getEmpresas().add(new Empresa(razaoSocial, "00.000.000/0001-00",
-                LocalDate.now(), limiteDependentes, diaVencimento));
+        Empresa empresa = new Empresa(razaoSocial, "00.000.000/0001-00",
+                LocalDate.now(), limiteDependentes, diaVencimento);
+        repositorio.getPlanos().forEach(plano -> plano.oferecerPara(empresa));
+        repositorio.getEmpresas().add(empresa);
     }
 
     public void criarPlano(String nome, int nivel, double valorMensal,
