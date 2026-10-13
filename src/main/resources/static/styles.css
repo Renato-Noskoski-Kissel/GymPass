@@ -131,6 +131,33 @@ body {
   color: var(--tinta-70);
 }
 
+/* ---------- abas do perfil Estabelecimento ---------- */
+
+.abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .2rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--linha);
+}
+
+.aba {
+  font: inherit;
+  font-weight: 500;
+  color: var(--tinta-70);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: .55rem .9rem;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+
+.aba:hover { color: var(--tinta); }
+.aba.ativa { color: var(--tinta); border-bottom-color: var(--verde); }
+
+.painel.oculta, .oculta { display: none; }
+
 /* ---------- blocos ---------- */
 
 .colunas {
@@ -457,7 +484,8 @@ button:focus-visible {
 
 .comprovante.recusado { background: #f8ecec; border-color: #dfbcbc; }
 .comprovante.recusado .comprovante-titulo { color: var(--carmim); }
-.comprovante.validado .comprovante-codigo { color: var(--tinta-40); text-decoration: line-through; }
+.comprovante.validado .comprovante-codigo,
+.comprovante.expirado .comprovante-codigo { color: var(--tinta-40); text-decoration: line-through; }
 
 /* ---------- reservas e recepção ---------- */
 

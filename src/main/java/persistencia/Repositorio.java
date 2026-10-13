@@ -50,9 +50,9 @@ public class Repositorio {
     /** Adesão vigente de um aluno, ou null se não houver. */
     public Adesao adesaoDe(Aluno aluno) {
         return adesoes.stream()
-                .filter(a -> a.getAluno() == aluno)
-                .filter(a -> a.getSituacao() != SituacaoAdesao.ENCERRADA)
-                .findFirst().orElse(null);
+            .filter(a -> a.getAluno() == aluno)
+            .filter(a -> a.getSituacao() != SituacaoAdesao.ENCERRADA)
+            .findFirst().orElse(null);
     }
 
     /**
@@ -70,9 +70,9 @@ public class Repositorio {
     }
 
     /**
-     * UC04a - reservas que o aluno fez no mês informado e que contam para o
-     * limite do plano. Conta pela data em que a reserva foi feita, não pela
-     * data da aula.
+     * UC04a - reservas do aluno em aulas do mês informado, que contam para o
+     * limite do plano. O mês é o da aula, não o do dia em que a reserva foi feita:
+     * reservar em outubro uma aula de novembro gasta o limite de novembro.
      *
      * Cancelada no prazo (UC04b) devolve a aula ao limite; cancelada com
      * penalidade continua contando.
@@ -81,9 +81,9 @@ public class Repositorio {
         int total = 0;
         for (Reserva r : reservas) {
             boolean contaNoLimite = r.getSituacao() != SituacaoReserva.CANCELADA
-                    || r.isPenalizada();
+                                 || r.isPenalizada();
             if (r.getAluno() == aluno && contaNoLimite
-                    && YearMonth.from(r.getDataHoraReserva()).equals(mes)) {
+                    && YearMonth.from(r.getAula().getDataHoraInicio()).equals(mes)) {
                 total++;
             }
         }
@@ -120,15 +120,16 @@ public class Repositorio {
         empresas.add(tech);
         empresas.add(norte);
 
-        Estudio studio = new Estudio("Studio Movimento", "22.222.222/0001-22", 12.5,
+        // RF5 - nível mínimo: Forte 1 (todos os planos), Quadra 2, Studio 3 (só Premium)
+        Estudio studio = new Estudio("Studio Movimento", "22.222.222/0001-22", 12.5, 3,
                 new Endereco("Rua Lauro Linhares", "1200", "Trindade", "Florianópolis",
                         "88036-002", -27.5893, -48.5196), 15);
         studio.aprovarCredenciamento();
-        Academia forte = new Academia("Academia Forte", "44.444.444/0001-44", 9.9,
+        Academia forte = new Academia("Academia Forte", "44.444.444/0001-44", 9.9, 1,
                 new Endereco("Rua Deputado Antônio Edu Vieira", "800", "Pantanal",
                         "Florianópolis", "88040-001", -27.6036, -48.5210), true);
         forte.aprovarCredenciamento();
-        Quadra areia = new Quadra("Quadra Areia", "55.555.555/0001-55", 15,
+        Quadra areia = new Quadra("Quadra Areia", "55.555.555/0001-55", 15, 2,
                 new Endereco("Avenida das Rendeiras", "300", "Lagoa da Conceição",
                         "Florianópolis", "88062-400", -27.6037, -48.4657), false);
         estabelecimentos.add(studio);
@@ -153,14 +154,6 @@ public class Repositorio {
             p.oferecerPara(norte);
             planos.add(p);
         }
-
-        // RF5 - Premium cobre o estúdio (só Pilates) e a academia; Basico só a academia.
-        premium.liberar(studio);
-        premium.liberar(pilates);
-        premium.liberar(forte);
-        premium.liberar(musculacao);
-        basico.liberar(forte);
-        basico.liberar(musculacao);
 
         Funcionario lara = new Funcionario("Lara Souza", "000.000.000-00", "lara@tech.com",
                 "F-001", LocalDate.of(2025, 3, 1), tech);

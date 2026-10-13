@@ -1,8 +1,8 @@
 package dominio.planosAdesao;
 
+import dominio.RegraDeNegocioException;
 import dominio.cadastroRede.Empresa;
 import dominio.cadastroRede.Estabelecimento;
-import dominio.cadastroRede.Modalidade;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,9 +10,9 @@ import java.util.List;
 /**
  * HU4 - nível de assinatura configurado pelo administrador.
  *
- * RF5 - o plano define quais estabelecimentos e quais modalidades libera.
- * O check-in exige o estabelecimento liberado; a reserva exige o
- * estabelecimento e a modalidade da aula.
+ * RF5 - a cobertura é por nível: o plano cobre todo estabelecimento cujo nível
+ * mínimo seja igual ou menor que o nível do plano, com todas as aulas de lá.
+ * Estabelecimento ou plano novo já entram na regra, sem configuração.
  */
 public class Plano {
 
@@ -25,12 +25,12 @@ public class Plano {
     /** Empresas que oferecem este plano aos seus funcionários. */
     private final List<Empresa> empresasQueOferecem = new ArrayList<>();
 
-    /** RF5 - cobertura do plano. */
-    private final List<Estabelecimento> estabelecimentosLiberados = new ArrayList<>();
-    private final List<Modalidade> modalidadesLiberadas = new ArrayList<>();
-
     public Plano(String nome, int nivel, double valorMensal,
                  int limiteAulasMes, boolean permiteDependentes) {
+        if (nivel < Estabelecimento.NIVEL_MIN || nivel > Estabelecimento.NIVEL_MAX) {
+            throw new RegraDeNegocioException("O nível do plano deve estar entre "
+                + Estabelecimento.NIVEL_MIN + " e " + Estabelecimento.NIVEL_MAX + ".");
+        }
         this.nome = nome;
         this.nivel = nivel;
         this.valorMensal = valorMensal;
@@ -55,40 +55,13 @@ public class Plano {
         return empresasQueOferecem.contains(empresa);
     }
 
-    /** RF5 - o administrador inclui um estabelecimento na cobertura do plano. */
-    public void liberar(Estabelecimento estabelecimento) {
-        if (!estabelecimentosLiberados.contains(estabelecimento)) {
-            estabelecimentosLiberados.add(estabelecimento);
-        }
-    }
-
-    /** RF5 - o administrador inclui uma modalidade na cobertura do plano. */
-    public void liberar(Modalidade modalidade) {
-        if (!modalidadesLiberadas.contains(modalidade)) {
-            modalidadesLiberadas.add(modalidade);
-        }
-    }
-
     /** RF5 - o plano cobre este estabelecimento? */
     public boolean libera(Estabelecimento estabelecimento) {
-        return estabelecimentosLiberados.contains(estabelecimento);
-    }
-
-    /** RF5 - o plano cobre esta modalidade? */
-    public boolean libera(Modalidade modalidade) {
-        return modalidadesLiberadas.contains(modalidade);
+        return nivel >= estabelecimento.getNivelMinimo();
     }
 
     public List<Empresa> getEmpresasQueOferecem() {
         return Collections.unmodifiableList(empresasQueOferecem);
-    }
-
-    public List<Estabelecimento> getEstabelecimentosLiberados() {
-        return Collections.unmodifiableList(estabelecimentosLiberados);
-    }
-
-    public List<Modalidade> getModalidadesLiberadas() {
-        return Collections.unmodifiableList(modalidadesLiberadas);
     }
 
     @Override public String toString() { return nome; }

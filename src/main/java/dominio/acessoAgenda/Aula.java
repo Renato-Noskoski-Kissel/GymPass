@@ -7,6 +7,7 @@ import dominio.cadastroRede.Instrutor;
 import dominio.cadastroRede.Modalidade;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -75,7 +76,8 @@ public class Aula {
     /**
      * UC04a passo 5 - registra a reserva de um aluno nesta aula.
      *
-     * Só verifica o que é da aula: se ela está aberta e se tem vaga. Elegibilidade,
+     * Só verifica o que é da aula: se ela está aberta, se o aluno já não tem vaga
+     * nela (3b) e se tem vaga sobrando. Elegibilidade,
      * cobertura do plano e limite mensal são verificados antes, por
      * Adesao.reservarVaga — use aquele método, não este diretamente.
      *
@@ -90,12 +92,31 @@ public class Aula {
         if (jaComecou()) {
             throw new RegraDeNegocioException("A aula já começou.");
         }
+        Reserva existente = reservaConfirmadaDe(aluno);
+        if (existente != null) {                                          // 3b
+            throw new RegraDeNegocioException(
+                aluno + " já tem vaga nesta aula (reservada em "
+                + existente.getDataHoraReserva().format(DateTimeFormatter.ofPattern("dd/MM")) + ").");
+        }
         if (vagasDisponiveis() <= 0) {
             throw new RegraDeNegocioException("A aula está lotada.");
         }
         Reserva reserva = new Reserva(aluno, this);
         reservas.add(reserva);
         return reserva;
+    }
+
+    /**
+     * UC04a 3b - reserva confirmada do aluno nesta aula, ou null.
+     * Uma reserva cancelada não conta: quem cancelou pode reservar de novo.
+     */
+    private Reserva reservaConfirmadaDe(Aluno aluno) {
+        for (Reserva r : reservas) {
+            if (r.getAluno() == aluno && r.getSituacao() == SituacaoReserva.CONFIRMADA) {
+                return r;
+            }
+        }
+        return null;
     }
 
     /** UC04a passo 3 - capacidade menos as reservas que ocupam vaga (todas, menos as canceladas). */

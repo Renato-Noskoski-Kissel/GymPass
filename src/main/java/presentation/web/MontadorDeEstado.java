@@ -3,6 +3,7 @@ package presentation.web;
 import dominio.acessoAgenda.Aula;
 import dominio.acessoAgenda.CheckIn;
 import dominio.acessoAgenda.Reserva;
+import dominio.acessoAgenda.SituacaoCheckIn;
 import dominio.cadastroRede.*;
 import dominio.planosAdesao.Adesao;
 import dominio.planosAdesao.Plano;
@@ -25,7 +26,7 @@ public class MontadorDeEstado {
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final DateTimeFormatter LEGIVEL =
-            DateTimeFormatter.ofPattern("EEE dd/MM 'às' HH:mm", new Locale("pt", "BR"));
+        DateTimeFormatter.ofPattern("EEE dd/MM 'às' HH:mm", new Locale("pt", "BR"));
 
     private final Repositorio repositorio;
 
@@ -58,7 +59,7 @@ public class MontadorDeEstado {
 
             Endereco end = e.getEndereco();
             saida.add(new EstabelecimentoDto(i, e.getNomeFantasia(), tipoDe(e),
-                    e.getValorPorCheckIn(), e.getSituacaoCredenciamento().name(),
+                    e.getValorPorCheckIn(), e.getNivelMinimo(), e.getSituacaoCredenciamento().name(),
                     end.toString(), end.getLatitude(), end.getLongitude(), mods, ins));
         }
         return saida;
@@ -113,17 +114,11 @@ public class MontadorDeEstado {
         return saida;
     }
 
-    /** Agrupa a cobertura do plano por estabelecimento, só para exibição. */
-    private List<CoberturaDto> coberturaDe(Plano p) {
-        List<CoberturaDto> saida = new ArrayList<>();
+    /** RF5 - nomes dos estabelecimentos que o nível do plano alcança. */
+    private List<String> coberturaDe(Plano p) {
+        List<String> saida = new ArrayList<>();
         for (Estabelecimento e : repositorio.getEstabelecimentos()) {
-            List<String> mods = new ArrayList<>();
-            for (Modalidade m : e.getModalidades()) {
-                if (p.libera(m)) mods.add(m.getNome());
-            }
-            if (p.libera(e) || !mods.isEmpty()) {
-                saida.add(new CoberturaDto(e.getNomeFantasia(), p.libera(e), mods));
-            }
+            if (p.libera(e)) saida.add(e.getNomeFantasia());
         }
         return saida;
     }
@@ -182,7 +177,7 @@ public class MontadorDeEstado {
                     c.getDataHora().format(LEGIVEL),
                     c.getDataHora().toLocalDate().equals(hoje),
                     c.getCodigo(),
-                    c.getSituacaoValidacao().name(),
+                    situacaoDe(c),
                     c.getMotivoRecusa()));
         }
         return saida;
@@ -191,7 +186,17 @@ public class MontadorDeEstado {
     /** UC07 passo 4 - o que a recepção vê ao localizar um check-in. */
     public ConferenciaDto conferencia(CheckIn c) {
         return new ConferenciaDto(c.getCodigo(), c.getAluno().getNome(),
-                c.getDataHora().format(LEGIVEL), c.getSituacaoValidacao().name());
+                c.getDataHora().format(LEGIVEL), situacaoDe(c));
+    }
+
+    /**
+     * UC03 7a - um pendente vencido ainda não foi marcado como expirado (isso só
+     * acontece quando alguém tenta validá-lo), mas para a tela ele já expirou.
+     */
+    private String situacaoDe(CheckIn c) {
+        return c.expirou(LocalDateTime.now())
+            ? SituacaoCheckIn.EXPIRADO.name()
+            : c.getSituacaoValidacao().name();
     }
 
     private List<ReservaDto> reservas() {

@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
  * Criado por Adesao.registrarCheckIn depois de todas as validações. Nasce
  * pendente, com um código que o aluno apresenta na recepção.
  *
- * UC07 - a recepção valida ou recusa o check-in. O código não expira
- * (expiração ficou fora do escopo).
+ * UC07 - a recepção valida ou recusa o check-in. O código vale até o fim do
+ * dia em que o check-in foi feito; depois disso o check-in expira (UC03 7a).
  *
  * As coordenadas de origem ficam registradas, mas não são expostas à empresa
  * contratante (RNF3).
@@ -53,6 +53,25 @@ public class CheckIn {
         return sb.toString();
     }
 
+    /** UC03 passo 7 - prazo de validade do comprovante: meia-noite do dia do check-in. */
+    public LocalDateTime prazoValidacao() {
+        return dataHora.toLocalDate().plusDays(1).atStartOfDay();
+    }
+
+    /** UC03 7a - o check-in ainda pendente passou do prazo neste momento? */
+    public boolean expirou(LocalDateTime momento) {
+        return situacaoValidacao == SituacaoCheckIn.PENDENTE
+            && !momento.isBefore(prazoValidacao());
+    }
+
+    /** UC03 7a - passa à situação expirada. Só um check-in pendente e vencido expira. */
+    public void expirar() {
+        if (!expirou(LocalDateTime.now())) {
+            throw new RegraDeNegocioException("Este check-in ainda está dentro do prazo.");
+        }
+        this.situacaoValidacao = SituacaoCheckIn.EXPIRADO;
+    }
+
     /** UC07 extensão 3c - o check-in só pode ser tratado na recepção onde foi feito. */
     public void conferirNaRecepcao(Estabelecimento recepcao) {
         if (recepcao != estabelecimento) {
@@ -77,11 +96,20 @@ public class CheckIn {
         this.situacaoValidacao = SituacaoCheckIn.RECUSADO;
     }
 
+    /**
+     * Validar e recusar só valem para check-in pendente e dentro do prazo.
+     * Um pendente vencido expira aqui mesmo e a operação é rejeitada (UC07 3b).
+     */
     private void exigirPendente() {
-        if (situacaoValidacao != SituacaoCheckIn.PENDENTE) {
-            throw new RegraDeNegocioException(
-                "Este check-in já foi " + (situacaoValidacao == SituacaoCheckIn.VALIDADO
-                    ? "validado." : "recusado."));
+        if (expirou(LocalDateTime.now())) {
+            expirar();
+        }
+        switch (situacaoValidacao) {
+            case PENDENTE -> { }
+            case VALIDADO -> throw new RegraDeNegocioException("Este check-in já foi validado.");
+            case RECUSADO -> throw new RegraDeNegocioException("Este check-in já foi recusado.");
+            case EXPIRADO -> throw new RegraDeNegocioException(
+                "Este check-in expirou. Peça ao aluno para fazer um novo check-in.");
         }
     }
 

@@ -21,7 +21,7 @@ public class Main {
         Endereco endStudio = new Endereco("Rua Lauro Linhares", "1200", "Trindade",
                 "Florianópolis", "88036-002", -27.5893, -48.5196);
         Estudio estudio = new Estudio("Studio Movimento", "22.222.222/0001-22", 12.50,
-                endStudio, 15);
+                3, endStudio, 15);
         estudio.aprovarCredenciamento();
         System.out.println("Credenciado? " + estudio.estaCredenciado());
 
@@ -67,6 +67,9 @@ public class Main {
                 "Filha", carla);
         tentar("RN3", () -> adesaoCarla.incluirDependente(filhaCarla));
 
+        // CPF com menos de 11 digitos
+        tentar("CPF invalido", () -> new Dependente("Teo", "123.456", "teo@mail.com", "Filho", carla));
+
         // ===== HU1 - estudio gerencia aulas =====
         Aula aula = estudio.agendarAula(LocalDateTime.now().plusDays(2),
                 Duration.ofMinutes(50), 10, pilates, ana);
@@ -81,18 +84,16 @@ public class Main {
         // HU1 - instrutor de outro estabelecimento nao pode ser atribuido
         Endereco endForte = new Endereco("Rua Deputado Antônio Edu Vieira", "800", "Pantanal",
                 "Florianópolis", "88040-001", -27.6036, -48.5210);
-        Academia forte = new Academia("Academia Forte", "44.444.444/0001-44", 9.90, endForte, true);
+        Academia forte = new Academia("Academia Forte", "44.444.444/0001-44", 9.90, 1, endForte, true);
         forte.aprovarCredenciamento();
         Instrutor externo = forte.contratarInstrutor("Rui", "CREF-9999", "Musculacao");
         tentar("instrutor externo", () -> aula.atribuirInstrutor(externo));
 
-        // ===== RF5 - cobertura dos planos =====
-        premium.liberar(estudio);
-        premium.liberar(pilates);
-        premium.liberar(forte);
-        basico.liberar(forte);
-        System.out.println("Premium cobre o Studio? " + premium.libera(estudio));
-        System.out.println("Basico cobre o Studio? " + basico.libera(estudio));
+        // ===== RF5 - cobertura por nivel: Studio exige 3, Forte exige 1 =====
+        System.out.println("Premium (3) cobre o Studio? " + premium.libera(estudio));
+        System.out.println("Basico (1) cobre o Studio? " + basico.libera(estudio));
+        System.out.println("Basico (1) cobre a Forte? " + basico.libera(forte));
+        tentar("nivel fora da faixa", () -> new Plano("Ouro", 6, 300, 10, true));
 
         double latPorta = endStudio.getLatitude();
         double lngPorta = endStudio.getLongitude();
@@ -128,7 +129,10 @@ public class Main {
         // 3a - aula lotada
         tentar("lotada", () -> adesaoMiguel.reservarVaga(turmaPequena, 0));
 
-        // limite mensal - o servico passa quantas reservas o aluno ja fez no mes
+        // 3b - o mesmo aluno nao reserva duas vezes a mesma aula
+        tentar("3b reserva duplicada", () -> adesaoLara.reservarVaga(turmaPequena, 1));
+
+        // limite mensal - o servico passa quantas reservas o aluno tem em aulas do mesmo mes
         tentar("limite mensal", () -> adesaoMiguel.reservarVaga(aula,
                 premium.getLimiteAulasMes()));
 
@@ -161,6 +165,7 @@ public class Main {
         System.out.println("Seria penalizado? " + tardia.cancelamentoSeriaPenalizado(LocalDateTime.now()));
         tardia.cancelar(LocalDateTime.now());
         System.out.println("Cancelada tarde: " + tardia);
+        // quem cancelou pode reservar a mesma aula de novo (a cancelada nao bloqueia o 3b)
 
         // 4b - aula ja comecou (o momento e passado de fora)
         Reserva atrasada = adesaoLara.reservarVaga(daquiAPouco, 2);
@@ -176,6 +181,7 @@ public class Main {
 
         // ===== UC07 - Validar Check-in na Recepcao =====
         System.out.println("Codigo do comprovante: " + checkInLara.getCodigo());
+        System.out.println("Valido ate: " + checkInLara.prazoValidacao());
         tentar("3c outro estabelecimento", () -> checkInLara.conferirNaRecepcao(forte));
         checkInLara.conferirNaRecepcao(estudio);
         checkInLara.validar();
@@ -185,6 +191,13 @@ public class Main {
         tentar("recusa sem motivo", () -> checkInCarla.recusar("  "));
         checkInCarla.recusar("Documento nao confere");
         System.out.println("Recusado: " + checkInCarla + " - " + checkInCarla.getMotivoRecusa());
+
+        // UC03 7a / UC07 3b - expiracao: pendente vence a meia-noite
+        CheckIn checkInMiguel = adesaoMiguel.registrarCheckIn(estudio, latPorta, lngPorta, null);
+        System.out.println("Expirou agora? " + checkInMiguel.expirou(LocalDateTime.now()));
+        System.out.println("Expira amanha? " + checkInMiguel.expirou(LocalDateTime.now().plusDays(1)));
+        tentar("expirar dentro do prazo", checkInMiguel::expirar);
+        System.out.println("Validado ja nao expira: " + checkInLara.expirou(LocalDateTime.now().plusDays(1)));
 
         // ===== HU2 - remocao do quadro derruba a elegibilidade em cascata (RN1) =====
         empresa.removerFuncionario(lara);

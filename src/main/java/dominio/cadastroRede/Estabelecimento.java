@@ -14,10 +14,20 @@ public abstract class Estabelecimento {
     /** RN4 - distância máxima entre o aluno e o estabelecimento para aceitar o check-in. */
     public static final double RAIO_MAXIMO_METROS = 200;
 
+    /** RF5 - faixa de níveis dos planos. O nível mínimo do estabelecimento fica nela. */
+    public static final int NIVEL_MIN = 1;
+    public static final int NIVEL_MAX = 5;
+
     private final String nomeFantasia;
     private final String cnpj;
     private SituacaoCredenciamento situacaoCredenciamento;
     private final double valorPorCheckIn;
+
+    /**
+     * RF5 - nível de plano exigido para usar este estabelecimento. Um plano de
+     * nível igual ou maior cobre o estabelecimento e todas as aulas dele.
+     */
+    private final int nivelMinimo;
 
     /** Composição: o endereço não existe fora do estabelecimento. */
     private final Endereco endereco;
@@ -32,13 +42,18 @@ public abstract class Estabelecimento {
     private final List<Aula> aulas = new ArrayList<>();
 
     protected Estabelecimento(String nomeFantasia, String cnpj, double valorPorCheckIn,
-                              Endereco endereco) {
+                              int nivelMinimo, Endereco endereco) {
         if (endereco == null) {
             throw new RegraDeNegocioException("Todo estabelecimento precisa de um endereço.");
+        }
+        if (nivelMinimo < NIVEL_MIN || nivelMinimo > NIVEL_MAX) {
+            throw new RegraDeNegocioException(
+                "O nível mínimo deve estar entre " + NIVEL_MIN + " e " + NIVEL_MAX + ".");
         }
         this.nomeFantasia = nomeFantasia;
         this.cnpj = cnpj;
         this.valorPorCheckIn = valorPorCheckIn;
+        this.nivelMinimo = nivelMinimo;
         this.endereco = endereco;
         this.situacaoCredenciamento = SituacaoCredenciamento.PENDENTE;
     }
@@ -46,6 +61,7 @@ public abstract class Estabelecimento {
     public String getNomeFantasia() { return nomeFantasia; }
     public String getCnpj() { return cnpj; }
     public double getValorPorCheckIn() { return valorPorCheckIn; }
+    public int getNivelMinimo() { return nivelMinimo; }
     public SituacaoCredenciamento getSituacaoCredenciamento() { return situacaoCredenciamento; }
     public Endereco getEndereco() { return endereco; }
 

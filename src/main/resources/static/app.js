@@ -19,12 +19,11 @@ let estado = {
 };
 
 let vistaAtual = 'admin';
+let abaAtual = 'cadastro';   // aba dentro do perfil Estabelecimento: cadastro, grade ou recepcao
 let empresaId = 0;
 let estabelecimentoId = 0;
 
 /* seleções que precisam sobreviver ao redesenho da tela */
-let coberturaPlanoId = 0;
-let coberturaEstabelecimentoId = 0;
 let alunoId = 0;
 let checkinEstabelecimentoId = null;
 let coordenadasDe = null;   // estabelecimento cujas coordenadas estão nos campos do check-in
@@ -128,7 +127,7 @@ function renderAdmin() {
         return `<div class="item">
           <div class="item-corpo">
             <div class="item-nome">${e.nome}</div>
-            <div class="item-detalhe">${e.tipo} · ${moeda(e.valorPorCheckIn)} por check-in</div>
+            <div class="item-detalhe">${e.tipo} · nível ${e.nivelMinimo} · ${moeda(e.valorPorCheckIn)} por check-in</div>
             <div class="item-detalhe">${e.endereco}</div>
           </div>
           ${selo(rotulo, classe)}
@@ -157,21 +156,10 @@ function renderAdmin() {
         <div class="plano-detalhe">${p.limiteAulasMes} aulas por mês</div>
         <div class="plano-detalhe">${p.permiteDependentes ? 'Aceita dependentes' : 'Sem dependentes'}</div>
         <div class="plano-cobre">${p.cobertura.length
-          ? p.cobertura.map(c => `<div>${c.estabelecimento}${
-              c.modalidades.length ? ': ' + c.modalidades.join(', ') : ''}${
-              c.estabelecimentoLiberado ? '' : ' (estabelecimento não liberado)'}</div>`).join('')
+          ? 'Cobre: ' + p.cobertura.join(', ')
           : '<p class="vazio">Não cobre nenhum estabelecimento</p>'}</div>
       </div>`).join('')
     : '<p class="vazio">Nenhum plano configurado. Sem plano não é possível incluir beneficiários.</p>';
-
-  preencherSelect($('#cob-plano'), estado.planos, p => p.nome, coberturaPlanoId);
-  preencherSelect($('#cob-estabelecimento'), estado.estabelecimentos,
-    e => e.nome, coberturaEstabelecimentoId);
-  const estCob = estado.estabelecimentos.find(e => e.id === coberturaEstabelecimentoId)
-    || estado.estabelecimentos[0];
-  $('#cob-modalidade').innerHTML = '<option value="">Acesso ao estabelecimento</option>'
-    + (estCob ? estCob.modalidades.map(m =>
-        `<option value="${m.id}">Modalidade ${m.nome}</option>`).join('') : '');
 }
 
 /* ---------- HU2: empresa ---------- */
@@ -221,14 +209,25 @@ function renderEmpresa() {
     : '<p class="vazio">Ninguém no quadro ainda. Inclua o primeiro funcionário abaixo.</p>';
 }
 
-/* ---------- HU5: estabelecimento ---------- */
+/* ---------- Estabelecimento: um seletor, três abas ---------- */
 
 function renderEstabelecimento() {
   preencherSelect($('#estabelecimento-atual'), estado.estabelecimentos,
     e => e.nome, estabelecimentoId);
   const est = estabelecimentoAtual();
-  if (!est) return;
 
+  document.querySelectorAll('.aba').forEach(b =>
+    b.classList.toggle('ativa', b.dataset.aba === abaAtual));
+  ['cadastro', 'grade', 'recepcao'].forEach(a =>
+    $('#aba-' + a).classList.toggle('oculta', a !== abaAtual));
+
+  if (!est) return;
+  ({ cadastro: renderCadastro, grade: renderGrade, recepcao: renderRecepcao })[abaAtual](est);
+}
+
+/* ---------- HU5: modalidades e instrutores ---------- */
+
+function renderCadastro(est) {
   $('#cont-modalidades').textContent = `${est.modalidades.length} cadastradas`;
   $('#lista-modalidades').innerHTML = est.modalidades.length
     ? est.modalidades.map(m => `<div class="item">
@@ -250,48 +249,11 @@ function renderEstabelecimento() {
         <button class="acao discreta risco" data-desligar="${i.id}">Desligar</button>
       </div>`).join('')
     : '<p class="vazio">Nenhum instrutor. Sem instrutor não é possível criar aulas.</p>';
+}
 
-  preencherSelect($('#recepcao-estabelecimento'), estado.estabelecimentos,
-    e => e.nome, estabelecimentoId);
+/* ---------- HU1: grade de aulas ---------- */
 
-  /* passo 4: nome do aluno e situação; a situação vem sempre do estado mais recente */
-  if (conferencia) {
-    const atual = estado.checkIns.find(c => c.codigo === conferencia.codigo);
-    const situacao = atual ? atual.situacao : conferencia.situacao;
-    const [rotulo, classe] = rotuloCheckIn[situacao];
-    $('#recepcao-resultado').innerHTML = `<div class="conferencia">
-        <div class="conferencia-nome">${conferencia.aluno}</div>
-        <div class="item-detalhe">Check-in ${conferencia.quando} · código ${conferencia.codigo}</div>
-        ${selo(rotulo, classe)}
-        ${situacao === 'PENDENTE' ? `<div class="botoes">
-          <button class="acao" data-validar>Liberar entrada</button>
-          <button class="acao discreta risco" data-recusar>Recusar entrada</button>
-        </div>` : ''}
-      </div>`;
-  } else {
-    $('#recepcao-resultado').innerHTML = '';
-  }
-
-  const deHoje = estado.checkIns.filter(c => c.estabelecimentoId === est.id && c.hoje);
-  const pendentes = deHoje.filter(c => c.situacao === 'PENDENTE').length;
-  $('#cont-recepcao').textContent = `${pendentes} aguardando`;
-  $('#lista-recepcao').innerHTML = deHoje.length
-    ? deHoje.slice().reverse().map(c => {
-        const [rotulo, classe] = rotuloCheckIn[c.situacao];
-        return `<div class="item">
-          <div class="item-corpo">
-            <div class="item-nome">${c.aluno}</div>
-            <div class="item-detalhe">${c.quando}${c.motivoRecusa ? ' · ' + c.motivoRecusa : ''}</div>
-          </div>
-          ${selo(rotulo, classe)}
-        </div>`;
-      }).join('')
-    : '<p class="vazio">Nenhum check-in neste estabelecimento hoje.</p>';
-
-  /* HU1: grade de aulas */
-  preencherSelect($('#grade-estabelecimento'), estado.estabelecimentos,
-    e => e.nome, estabelecimentoId);
-
+function renderGrade(est) {
   preencherSelect($('#aula-modalidade'), est.modalidades, m => m.nome);
   preencherSelect($('#aula-instrutor'), est.instrutores, i => i.nome);
 
@@ -354,9 +316,10 @@ function renderAluno() {
   $('#cont-checkins').textContent = `${meusCheckIns.length} registrados`;
   const deHoje = meusCheckIns.filter(c => c.hoje).pop();
   const situacaoComprovante = {
-    PENDENTE: ['', 'Apresente este código na recepção'],
+    PENDENTE: ['', 'Apresente este código na recepção. Vale até o fim de hoje.'],
     VALIDADO: [' validado', 'Entrada liberada pela recepção'],
-    RECUSADO: [' recusado', 'Entrada recusada pela recepção']
+    RECUSADO: [' recusado', 'Entrada recusada pela recepção'],
+    EXPIRADO: [' expirado', 'Código expirado. Faça um novo check-in.']
   };
   if (deHoje) {
     const [classe, texto] = situacaoComprovante[deHoje.situacao];
@@ -421,6 +384,8 @@ function renderAluno() {
     (ativas.length ? htmlAtivas : '<p class="vazio">Nenhuma reserva ativa. Escolha uma aula abaixo.</p>')
     + (historico.length ? '<p class="lista-titulo">Histórico</p>' + htmlHistorico : '');
 
+  /* UC04a 3b: aula em que o aluno já tem reserva confirmada não oferece "Reservar" */
+  const jaReservou = a => minhas.some(r => r.aulaId === a.id && r.situacao === 'CONFIRMADA');
   const abertas = estado.aulas.filter(a => !a.cancelada && !a.jaComecou)
     .sort((a, b) => a.inicio.localeCompare(b.inicio));
   $('#aulas-reserva').innerHTML = abertas.length
@@ -430,7 +395,9 @@ function renderAluno() {
         <div class="vagas" aria-hidden="true">${barraDeVagas(a)}</div>
         <div class="vagas-nota">${a.vagasDisponiveis} de ${a.capacidade} vagas livres</div>
         <div class="aula-acoes">
-          <button class="acao discreta" data-reservar="${a.id}">Reservar vaga</button>
+          ${jaReservou(a)
+            ? selo('Você tem vaga nesta aula', 'aprovado')
+            : `<button class="acao discreta" data-reservar="${a.id}">Reservar vaga</button>`}
         </div>
       </article>`).join('')
     : '<p class="vazio">Nenhuma aula aberta na rede.</p>';
@@ -441,23 +408,62 @@ function renderAluno() {
 const rotuloCheckIn = {
   PENDENTE: ['Aguardando validação', 'pendente'],
   VALIDADO: ['Entrada liberada', 'aprovado'],
-  RECUSADO: ['Recusado', 'suspenso']
+  RECUSADO: ['Recusado', 'suspenso'],
+  EXPIRADO: ['Expirado', 'inativo']
 };
 
+function renderRecepcao(est) {
+  /* Só estabelecimento credenciado recebe check-in, então só ele usa a recepção. */
+  const credenciado = est.situacao === 'APROVADO';
+  $('#recepcao-sem-credenciamento').classList.toggle('oculta', credenciado);
+  $('#recepcao-conteudo').classList.toggle('oculta', !credenciado);
+  if (!credenciado) return;
+
+  /* passo 4: nome do aluno e situação; a situação vem sempre do estado mais recente */
+  if (conferencia) {
+    const atual = estado.checkIns.find(c => c.codigo === conferencia.codigo);
+    const situacao = atual ? atual.situacao : conferencia.situacao;
+    const [rotulo, classe] = rotuloCheckIn[situacao];
+    $('#recepcao-resultado').innerHTML = `<div class="conferencia">
+        <div class="conferencia-nome">${conferencia.aluno}</div>
+        <div class="item-detalhe">Check-in ${conferencia.quando} · código ${conferencia.codigo}</div>
+        ${selo(rotulo, classe)}
+        ${situacao === 'PENDENTE' ? `<div class="botoes">
+          <button class="acao" data-validar>Liberar entrada</button>
+          <button class="acao discreta risco" data-recusar>Recusar entrada</button>
+        </div>` : ''}
+      </div>`;
+  } else {
+    $('#recepcao-resultado').innerHTML = '';
+  }
+
+  const deHoje = estado.checkIns.filter(c => c.estabelecimentoId === est.id && c.hoje);
+  const pendentes = deHoje.filter(c => c.situacao === 'PENDENTE').length;
+  $('#cont-recepcao').textContent = `${pendentes} aguardando`;
+  $('#lista-recepcao').innerHTML = deHoje.length
+    ? deHoje.slice().reverse().map(c => {
+        const [rotulo, classe] = rotuloCheckIn[c.situacao];
+        return `<div class="item">
+          <div class="item-corpo">
+            <div class="item-nome">${c.aluno}</div>
+            <div class="item-detalhe">${c.quando}${c.motivoRecusa ? ' · ' + c.motivoRecusa : ''}</div>
+          </div>
+          ${selo(rotulo, classe)}
+        </div>`;
+      }).join('')
+    : '<p class="vazio">Nenhum check-in neste estabelecimento hoje.</p>';
+}
 
 const vistas = {
   admin: { render: renderAdmin, contexto: 'Administração da plataforma' },
   empresa: { render: renderEmpresa, contexto: 'Visão da empresa contratante' },
   estabelecimento: { render: renderEstabelecimento, contexto: 'Visão do estabelecimento parceiro' },
-  aluno: { render: renderAluno, contexto: 'Visão do aluno' },
+  aluno: { render: renderAluno, contexto: 'Visão do aluno' }
 };
 
 function render() {
   Object.keys(vistas).forEach(v =>
     $('#vista-' + v).classList.toggle('oculta', v !== vistaAtual));
-  /* grade e recepção agora fazem parte da visão do estabelecimento */
-  ['grade', 'recepcao'].forEach(v =>
-    $('#vista-' + v).classList.toggle('oculta', vistaAtual !== 'estabelecimento'));
   $('#contexto').textContent = vistas[vistaAtual].contexto;
   vistas[vistaAtual].render();
 }
@@ -484,6 +490,7 @@ $('#form-estabelecimento').addEventListener('submit', ev => {
     nome,
     tipo: $('#est-tipo').value,
     valorPorCheckIn: parseFloat($('#est-valor').value),
+    nivelMinimo: parseInt($('#est-nivel').value),
     logradouro: $('#est-logradouro').value.trim(),
     numero: $('#est-numero').value.trim(),
     bairro: $('#est-bairro').value.trim(),
@@ -517,38 +524,6 @@ $('#form-plano').addEventListener('submit', ev => {
     permiteDependentes: $('#plano-dep').checked
   }).then(() => ev.target.reset()),
   `Plano ${nome} criado e disponibilizado às empresas.`);
-});
-
-$('#cob-plano').addEventListener('change', ev => {
-  coberturaPlanoId = parseInt(ev.target.value);
-});
-
-$('#cob-estabelecimento').addEventListener('change', ev => {
-  coberturaEstabelecimentoId = parseInt(ev.target.value);
-  render();
-});
-
-$('#form-cobertura').addEventListener('submit', ev => {
-  ev.preventDefault();
-  const plano = estado.planos.find(p => p.id === parseInt($('#cob-plano').value));
-  const est = estado.estabelecimentos.find(e => e.id === parseInt($('#cob-estabelecimento').value));
-  if (!plano || !est) {
-    avisar('Crie um plano e um estabelecimento antes de configurar a cobertura.', 'erro');
-    return;
-  }
-  coberturaPlanoId = plano.id;
-  coberturaEstabelecimentoId = est.id;
-  const valor = $('#cob-modalidade').value;
-
-  if (valor === '') {
-    executar(() => api(`/planos/${plano.id}/estabelecimentos`, 'POST',
-      { estabelecimentoId: est.id }), `${est.nome} liberado no plano ${plano.nome}.`);
-  } else {
-    const mod = est.modalidades.find(m => m.id === parseInt(valor));
-    executar(() => api(`/planos/${plano.id}/modalidades`, 'POST',
-      { estabelecimentoId: est.id, modalidadeId: mod.id }),
-      `${mod.nome} de ${est.nome} liberada no plano ${plano.nome}.`);
-  }
 });
 
 $('#vista-admin').addEventListener('click', ev => {
@@ -616,12 +591,22 @@ $('#vista-empresa').addEventListener('click', ev => {
   }
 });
 
-/* --- HU5 --- */
+/* --- Estabelecimento: seletor e abas --- */
 
 $('#estabelecimento-atual').addEventListener('change', ev => {
   estabelecimentoId = parseInt(ev.target.value);
+  conferencia = null;
   render();
 });
+
+document.querySelectorAll('.aba').forEach(botao => {
+  botao.addEventListener('click', () => {
+    abaAtual = botao.dataset.aba;
+    render();
+  });
+});
+
+/* --- HU5 --- */
 
 $('#form-modalidade').addEventListener('submit', ev => {
   ev.preventDefault();
@@ -657,11 +642,6 @@ $('#vista-estabelecimento').addEventListener('click', ev => {
 
 /* --- HU1 --- */
 
-$('#grade-estabelecimento').addEventListener('change', ev => {
-  estabelecimentoId = parseInt(ev.target.value);
-  render();
-});
-
 $('#form-aula').addEventListener('submit', ev => {
   ev.preventDefault();
   const modalidadeId = parseInt($('#aula-modalidade').value);
@@ -684,7 +664,7 @@ $('#form-aula').addEventListener('submit', ev => {
   }), 'Aula agendada.');
 });
 
-$('#vista-grade').addEventListener('click', ev => {
+$('#aba-grade').addEventListener('click', ev => {
   const { instrutorAula, capacidade, cancelar } = ev.target.dataset;
   const est = estabelecimentoAtual();
 
@@ -793,14 +773,8 @@ $('#vista-aluno').addEventListener('click', ev => {
 
 /* --- UC07 --- */
 
-$('#recepcao-estabelecimento').addEventListener('change', ev => {
-  estabelecimentoId = parseInt(ev.target.value);
-  conferencia = null;
-  render();
-});
-
 const caminhoRecepcao = codigo =>
-  `/recepcao/${estabelecimentoId}/checkins/${encodeURIComponent(codigo)}`;
+  `/recepcao/${estabelecimentoAtual().id}/checkins/${encodeURIComponent(codigo)}`;
 
 $('#form-codigo').addEventListener('submit', ev => {
   ev.preventDefault();
@@ -818,12 +792,12 @@ $('#form-cpf').addEventListener('submit', ev => {
   const cpf = $('#recepcao-cpf').value.replace(/\D/g, '');
   conferencia = null;
   executar(async () => {
-    conferencia = await api(`/recepcao/${estabelecimentoId}/cpf/${cpf}`);
+    conferencia = await api(`/recepcao/${estabelecimentoAtual().id}/cpf/${cpf}`);
     ev.target.reset();
   });
 });
 
-$('#vista-recepcao').addEventListener('click', ev => {
+$('#aba-recepcao').addEventListener('click', ev => {
   if (!conferencia) return;
   const { validar, recusar } = ev.target.dataset;
 

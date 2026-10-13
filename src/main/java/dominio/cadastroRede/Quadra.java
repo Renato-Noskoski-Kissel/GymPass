@@ -4,8 +4,8 @@ public class Quadra extends Estabelecimento {
     private final boolean coberta;
 
     public Quadra(String nomeFantasia, String cnpj, double valorPorCheckIn,
-                  Endereco endereco, boolean coberta) {
-        super(nomeFantasia, cnpj, valorPorCheckIn, endereco);
+                  int nivelMinimo, Endereco endereco, boolean coberta) {
+        super(nomeFantasia, cnpj, valorPorCheckIn, nivelMinimo, endereco);
         this.coberta = coberta;
     }
 

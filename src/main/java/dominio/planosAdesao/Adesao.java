@@ -12,6 +12,7 @@ import dominio.cadastroRede.Funcionario;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /**
  * Classe de associação entre Aluno e Plano.
@@ -144,8 +145,7 @@ public class Adesao {
                 + ". O limite é um por dia (RN2).");
         }
         if (!plano.libera(estabelecimento)) {
-            throw new RegraDeNegocioException(
-                "O plano " + plano.getNome() + " não cobre " + estabelecimento + " (RF5).");
+            throw new RegraDeNegocioException(semCobertura(estabelecimento));
         }
         return new CheckIn(aluno, estabelecimento, latitude, longitude);
     }
@@ -156,7 +156,7 @@ public class Adesao {
      * Verifica o direito de acesso (passo 2, inclui Validar Elegibilidade) e
      * delega à aula a verificação de vaga e a criação da reserva (passos 3 e 5).
      *
-     * @param reservasNoMes reservas que o aluno já fez no mês corrente.
+     * @param reservasNoMes reservas que o aluno já tem em aulas do mesmo mês desta aula.
      */
     public Reserva reservarVaga(Aula aula, int reservasNoMes) {
         if (!estaAtiva()) {
@@ -164,22 +164,22 @@ public class Adesao {
                 "O vínculo de " + aluno + " com o benefício não está ativo (RN1).");
         }
         if (!plano.libera(aula.getEstabelecimento())) {
-            throw new RegraDeNegocioException(
-                "O plano " + plano.getNome() + " não cobre " + aula.getEstabelecimento() + " (RF5).");
-        }
-        if (!plano.libera(aula.getModalidade())) {
-            throw new RegraDeNegocioException(
-                "O plano " + plano.getNome() + " não cobre a modalidade "
-                + aula.getModalidade() + " (RF5).");
+            throw new RegraDeNegocioException(semCobertura(aula.getEstabelecimento()));
         }
         if (reservasNoMes >= plano.getLimiteAulasMes()) {
-            String renovacao = YearMonth.now().plusMonths(1).atDay(1)
-                .format(DateTimeFormatter.ofPattern("dd/MM"));
+            String mes = YearMonth.from(aula.getDataHoraInicio())
+                .format(DateTimeFormatter.ofPattern("MMMM 'de' yyyy", new Locale("pt", "BR")));
             throw new RegraDeNegocioException(
                 "Limite de " + plano.getLimiteAulasMes() + " aulas por mês do plano "
-                + plano.getNome() + " atingido. Renova em " + renovacao + ".");
+                + plano.getNome() + " atingido para " + mes + ".");
         }
         return aula.reservar(aluno);
+    }
+
+    /** UC03 5b e UC04a 2b - informa qual nível seria necessário. */
+    private String semCobertura(Estabelecimento e) {
+        return "O plano " + plano.getNome() + " (nível " + plano.getNivel() + ") não cobre "
+             + e + ", que exige nível " + e.getNivelMinimo() + " (RF5).";
     }
 
     public Aluno getAluno() { return aluno; }

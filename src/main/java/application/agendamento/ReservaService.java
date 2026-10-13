@@ -31,7 +31,8 @@ public class ReservaService {
         Aluno aluno = repositorio.getAlunos().get(alunoId);
         Aula aula = repositorio.getAulas().get(aulaId);
         Adesao adesao = adesaoVigente(aluno);
-        int reservasNoMes = repositorio.totalReservasNoMes(aluno, YearMonth.now());
+        YearMonth mesDaAula = YearMonth.from(aula.getDataHoraInicio());
+        int reservasNoMes = repositorio.totalReservasNoMes(aluno, mesDaAula);
 
         Reserva reserva = adesao.reservarVaga(aula, reservasNoMes);
         repositorio.getReservas().add(reserva);
