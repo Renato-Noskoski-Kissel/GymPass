@@ -31,6 +31,16 @@ public class EmpresaController {
         servico.trocarPlano(empresaId, funcionarioId, dados.planoId());
     }
 
+    @PostMapping("/funcionarios/{funcionarioId}/suspender")
+    public void suspenderAdesao(@PathVariable int empresaId, @PathVariable int funcionarioId) {
+        servico.suspenderAdesao(empresaId, funcionarioId);
+    }
+
+    @PostMapping("/funcionarios/{funcionarioId}/reativar")
+    public void reativarAdesao(@PathVariable int empresaId, @PathVariable int funcionarioId) {
+        servico.reativarAdesao(empresaId, funcionarioId);
+    }
+
     @PostMapping("/funcionarios/{funcionarioId}/dependentes")
     public void incluirDependente(@PathVariable int empresaId, @PathVariable int funcionarioId,
                                   @RequestBody NovoDependente dados) {

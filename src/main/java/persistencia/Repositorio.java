@@ -7,7 +7,6 @@ import dominio.acessoAgenda.SituacaoReserva;
 import dominio.cadastroRede.*;
 import dominio.planosAdesao.Adesao;
 import dominio.planosAdesao.Plano;
-import dominio.planosAdesao.SituacaoAdesao;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -51,7 +50,7 @@ public class Repositorio {
     public Adesao adesaoDe(Aluno aluno) {
         return adesoes.stream()
             .filter(a -> a.getAluno() == aluno)
-            .filter(a -> a.getSituacao() != SituacaoAdesao.ENCERRADA)
+            .filter(Adesao::estaVigente)
             .findFirst().orElse(null);
     }
 

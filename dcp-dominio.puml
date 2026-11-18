@@ -118,14 +118,19 @@ package "Planos e Adesão" {
     -plano : Plano
     -dataInicio : LocalDate
     -dataFim : LocalDate
-    -situacao : SituacaoAdesao
+    -estado : EstadoAdesao
     {static} +cadastrarBeneficiario(f : Funcionario, p : Plano) : Adesao
     {static} +trocarPlano(atual : Adesao, novo : Plano) : Adesao
     +incluirDependente(d : Dependente) : Adesao
     +estaAtiva() : boolean
+    +estaVigente() : boolean
+    +podeSuspender() : boolean
+    +podeReativar() : boolean
     +encerrar() : void
     +suspender() : void
     +reativar() : void
+    ~mudarPara(novoEstado : EstadoAdesao) : void
+    ~registrarFim(data : LocalDate) : void
     +getAluno() : Aluno
     +getPlano() : Plano
     +getDataInicio() : LocalDate
@@ -135,6 +140,25 @@ package "Planos e Adesão" {
     +registrarCheckIn(e : Estabelecimento, lat : double, lng : double, ultimo : CheckIn) : CheckIn
     +reservarVaga(a : Aula, reservasMes : int) : Reserva
   }
+
+  interface EstadoAdesao {
+    +incluirDependente(ad : Adesao, d : Dependente) : Adesao
+    +registrarCheckIn(ad : Adesao, e : Estabelecimento, lat : double, lng : double, ultimo : CheckIn) : CheckIn
+    +reservarVaga(ad : Adesao, a : Aula, reservasMes : int) : Reserva
+    +trocarPlano(ad : Adesao, novoPlano : Plano) : Adesao
+    +suspender(ad : Adesao) : void
+    +reativar(ad : Adesao) : void
+    +encerrar(ad : Adesao) : void
+    +estaAtiva() : boolean
+    +estaVigente() : boolean
+    +podeSuspender() : boolean
+    +podeReativar() : boolean
+    +situacao() : SituacaoAdesao
+  }
+
+  class Ativa
+  class Suspensa
+  class Encerrada
 }
 
 ' =====================================================================
@@ -485,6 +509,10 @@ Estabelecimento "1" <--> "0..*" Instrutor : contrata >
 ' =====================================================================
 Adesao "1..*" --> "1" Aluno : concedida-a >
 Adesao "0..*" --> "1" Plano : refere-se-a >
+Adesao "1" o--> "1" EstadoAdesao : estado atual >
+EstadoAdesao <|.. Ativa
+EstadoAdesao <|.. Suspensa
+EstadoAdesao <|.. Encerrada
 Plano "0..*" --> "0..*" Empresa : oferecido-por >
 Plano "1..*" --> "1..*" Estabelecimento : libera >
 Plano "1..*" --> "1..*" Modalidade : libera >

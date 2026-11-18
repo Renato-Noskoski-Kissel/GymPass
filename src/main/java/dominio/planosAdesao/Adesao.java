@@ -10,9 +10,6 @@ import dominio.cadastroRede.Empresa;
 import dominio.cadastroRede.Estabelecimento;
 import dominio.cadastroRede.Funcionario;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
 
 /**
  * Classe de associação entre Aluno e Plano.
@@ -27,6 +24,10 @@ import java.util.Locale;
  * Iteração 2: a Adesao valida e cria o check-in e a reserva, porque é a única
  * classe que enxerga ao mesmo tempo o aluno (elegibilidade) e o plano
  * (cobertura e limite mensal) — Especialista da Informação.
+ *
+ * Padrão State: o que cada operação faz depende da situação da adesão
+ * (Ativa, Suspensa, Encerrada). As validações moram nos estados; esta
+ * classe só delega ao estado corrente.
  */
 public class Adesao {
 
@@ -34,13 +35,14 @@ public class Adesao {
     private final Plano plano;
     private final LocalDate dataInicio;
     private LocalDate dataFim;
-    private SituacaoAdesao situacao;
+    private EstadoAdesao estado;
 
-    private Adesao(Aluno aluno, Plano plano) {
+    /** Visível no pacote para que Ativa crie a adesão do dependente (RN3). */
+    Adesao(Aluno aluno, Plano plano) {
         this.aluno = aluno;
         this.plano = plano;
         this.dataInicio = LocalDate.now();
-        this.situacao = SituacaoAdesao.ATIVA;
+        this.estado = new Ativa();
     }
 
     /**
@@ -65,146 +67,59 @@ public class Adesao {
     }
 
     /**
-     * HU2 - troca do nível de plano do funcionário.
-     *
-     * Com multiplicidade 1, a adesão anterior é substituída e não é preservada.
-     * Se o histórico passar a ser necessário (cálculo de fatura por período),
-     * a multiplicidade precisará mudar para 1..*.
+     * HU2 - troca do nível de plano do funcionário. Só uma adesão ativa pode
+     * trocar; quem decide é o estado (ver Ativa, Suspensa e Encerrada).
      */
     public static Adesao trocarPlano(Adesao adesaoAtual, Plano novoPlano) {
-        Aluno aluno = adesaoAtual.getAluno();
-        if (!novoPlano.ehOferecidoPor(aluno.getEmpresaVinculada())) {
-            throw new RegraDeNegocioException(
-                "A empresa " + aluno.getEmpresaVinculada()
-                + " não oferece o plano " + novoPlano.getNome());
-        }
-        adesaoAtual.encerrar();
-        return new Adesao(aluno, novoPlano);
+        return adesaoAtual.estado.trocarPlano(adesaoAtual, novoPlano);
     }
 
-    /**
-     * RN3 - inclusão de dependente. Depende do plano (nem todo plano permite)
-     * e do limite estipulado no contrato da empresa.
-     *
-     * O dependente recebe uma Adesao própria, sempre ao mesmo plano do
-     * responsável — restrição que o diagrama de classes não expressa.
-     */
+    /** RN3 - ver Ativa.incluirDependente. */
     public Adesao incluirDependente(Dependente dependente) {
-        if (!estaAtiva()) {
-            throw new RegraDeNegocioException("Adesão não está ativa.");
-        }
-        if (!(aluno instanceof Funcionario funcionario)) {
-            throw new RegraDeNegocioException("Somente funcionários podem incluir dependentes.");
-        }
-        if (dependente.getResponsavel() != funcionario) {
-            throw new RegraDeNegocioException(dependente + " não é dependente de " + funcionario);
-        }
-        if (!plano.permiteDependentes()) {
-            throw new RegraDeNegocioException(
-                "O plano " + plano.getNome() + " não permite dependentes (RN3).");
-        }
-        int limite = funcionario.getEmpresaVinculada().getLimiteDependentes();
-        if (funcionario.getDependentes().size() >= limite) {
-            throw new RegraDeNegocioException(
-                "Limite de dependentes da empresa atingido (RN3): " + limite);
-        }
-
-        funcionario.vincularDependente(dependente);
-        return new Adesao(dependente, plano);
+        return estado.incluirDependente(this, dependente);
     }
 
-    /**
-     * UC03 - Realizar Check-in.
-     *
-     * Ordem das verificações, a mesma da UC: credenciamento (pré-condição),
-     * proximidade (passo 4, inclui Validar Localização do Dispositivo) e
-     * direito de acesso (passo 5, inclui Validar Elegibilidade).
-     *
-     * @param ultimo último check-in do aluno, ou null se nunca fez nenhum.
-     *               A regra "um por dia" (RN2) é decidida aqui, não na consulta.
-     */
+    /** UC03 - ver Ativa.registrarCheckIn. */
     public CheckIn registrarCheckIn(Estabelecimento estabelecimento,
                                     double latitude, double longitude, CheckIn ultimo) {
-        if (!estabelecimento.estaCredenciado()) {
-            throw new RegraDeNegocioException(
-                estabelecimento + " não tem credenciamento aprovado na rede.");
-        }
-        if (!estabelecimento.estaNoRaio(latitude, longitude)) {
-            double distancia = estabelecimento.getEndereco().distanciaAte(latitude, longitude);
-            throw new RegraDeNegocioException(String.format(
-                "Você está a %.0f m de %s. O check-in só é aceito a até %.0f m (RN4).",
-                distancia, estabelecimento, Estabelecimento.RAIO_MAXIMO_METROS));
-        }
-        if (!estaAtiva()) {
-            throw new RegraDeNegocioException(
-                "O vínculo de " + aluno + " com o benefício não está ativo (RN1).");
-        }
-        if (ultimo != null && ultimo.getDataHora().toLocalDate().equals(LocalDate.now())) {
-            throw new RegraDeNegocioException(
-                aluno + " já fez check-in hoje em " + ultimo.getEstabelecimento()
-                + ". O limite é um por dia (RN2).");
-        }
-        if (!plano.libera(estabelecimento)) {
-            throw new RegraDeNegocioException(semCobertura(estabelecimento));
-        }
-        return new CheckIn(aluno, estabelecimento, latitude, longitude);
+        return estado.registrarCheckIn(this, estabelecimento, latitude, longitude, ultimo);
     }
 
-    /**
-     * UC04a - Reservar Vaga em Aula.
-     *
-     * Verifica o direito de acesso (passo 2, inclui Validar Elegibilidade) e
-     * delega à aula a verificação de vaga e a criação da reserva (passos 3 e 5).
-     *
-     * @param reservasNoMes reservas que o aluno já tem em aulas do mesmo mês desta aula.
-     */
+    /** UC04a - ver Ativa.reservarVaga. */
     public Reserva reservarVaga(Aula aula, int reservasNoMes) {
-        if (!estaAtiva()) {
-            throw new RegraDeNegocioException(
-                "O vínculo de " + aluno + " com o benefício não está ativo (RN1).");
-        }
-        if (!plano.libera(aula.getEstabelecimento())) {
-            throw new RegraDeNegocioException(semCobertura(aula.getEstabelecimento()));
-        }
-        if (reservasNoMes >= plano.getLimiteAulasMes()) {
-            String mes = YearMonth.from(aula.getDataHoraInicio())
-                .format(DateTimeFormatter.ofPattern("MMMM 'de' yyyy", new Locale("pt", "BR")));
-            throw new RegraDeNegocioException(
-                "Limite de " + plano.getLimiteAulasMes() + " aulas por mês do plano "
-                + plano.getNome() + " atingido para " + mes + ".");
-        }
-        return aula.reservar(aluno);
+        return estado.reservarVaga(this, aula, reservasNoMes);
     }
 
-    /** UC03 5b e UC04a 2b - informa qual nível seria necessário. */
-    private String semCobertura(Estabelecimento e) {
-        return "O plano " + plano.getNome() + " (nível " + plano.getNivel() + ") não cobre "
-             + e + ", que exige nível " + e.getNivelMinimo() + " (RF5).";
-    }
+    /** RN7 - suspensão por inadimplência da empresa contratante. */
+    public void suspender() { estado.suspender(this); }
+
+    public void reativar() { estado.reativar(this); }
+
+    /** HU2 - a empresa encerra o benefício do funcionário. */
+    public void encerrar() { estado.encerrar(this); }
+
+    /** Transição de estado; só os próprios estados a disparam. */
+    void mudarPara(EstadoAdesao novoEstado) { this.estado = novoEstado; }
+
+    void registrarFim(LocalDate data) { this.dataFim = data; }
 
     public Aluno getAluno() { return aluno; }
     public Plano getPlano() { return plano; }
     public LocalDate getDataInicio() { return dataInicio; }
     public LocalDate getDataFim() { return dataFim; }
-    public SituacaoAdesao getSituacao() { return situacao; }
+    public SituacaoAdesao getSituacao() { return estado.situacao(); }
 
-    /** Ativa somente se a própria adesão e a elegibilidade do aluno estiverem em ordem. */
-    public boolean estaAtiva() {
-        return situacao == SituacaoAdesao.ATIVA && aluno.ehElegivel();
-    }
+    /** Ativa somente se a própria adesão e a elegibilidade do aluno estiverem em ordem (RN1). */
+    public boolean estaAtiva() { return estado.estaAtiva() && aluno.ehElegivel(); }
 
-    /** HU2 - a empresa encerra o benefício do funcionário. */
-    public void encerrar() {
-        this.situacao = SituacaoAdesao.ENCERRADA;
-        this.dataFim = LocalDate.now();
-    }
+    /** Adesão corrente do aluno (ativa ou suspensa), isto é, ainda não encerrada. */
+    public boolean estaVigente() { return estado.estaVigente(); }
 
-    /** RN7 - suspensão por inadimplência da empresa contratante. */
-    public void suspender() { this.situacao = SituacaoAdesao.SUSPENSA; }
+    public boolean podeSuspender() { return estado.podeSuspender(); }
 
-    public void reativar() { this.situacao = SituacaoAdesao.ATIVA; }
+    public boolean podeReativar() { return estado.podeReativar(); }
 
     @Override public String toString() {
-        return "Adesao de " + aluno + " ao plano " + plano + " [" + situacao + "]";
+        return "Adesao de " + aluno + " ao plano " + plano + " [" + estado.situacao() + "]";
     }
 }

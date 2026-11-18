@@ -86,6 +86,12 @@ function selo(texto, classe) {
   return `<span class="selo ${classe}">${texto}</span>`;
 }
 
+/** Selo de beneficiário: a suspensão por inadimplência (RN7) tem precedência. */
+function seloBeneficiario(b) {
+  if (b.situacaoAdesao === 'SUSPENSA') return selo('Suspenso', 'suspenso');
+  return b.elegivel ? selo('Ativo', 'aprovado') : selo('Sem acesso', 'inativo');
+}
+
 function moeda(v) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -190,7 +196,7 @@ function renderEmpresa() {
   $('#lista-funcionarios').innerHTML = empresa.funcionarios.length
     ? empresa.funcionarios.map(f => {
         const deps = f.dependentes.map(d =>
-          `<div class="item-detalhe">${d.nome} · ${d.grauParentesco} · CPF ${d.cpf}${d.elegivel ? '' : ' (inativo)'}</div>`
+          `<div class="item-detalhe">${d.nome} · ${d.grauParentesco} · CPF ${d.cpf} ${seloBeneficiario(d)}</div>`
         ).join('');
         const podeDep = f.planoPermiteDependentes
           && f.dependentes.length < empresa.limiteDependentes;
@@ -200,8 +206,10 @@ function renderEmpresa() {
             <div class="item-detalhe">${f.matricula} · CPF ${f.cpf} · plano ${f.plano || 'nenhum'}</div>
             ${deps}
           </div>
-          ${f.elegivel ? selo('Ativo', 'aprovado') : selo('Sem acesso', 'inativo')}
+          ${seloBeneficiario(f)}
           <button class="acao discreta" data-trocar="${f.id}">Trocar plano</button>
+          ${f.podeSuspender ? `<button class="acao discreta" data-suspender="${f.id}">Suspender benefício</button>` : ''}
+          ${f.podeReativar ? `<button class="acao discreta" data-reativar="${f.id}">Reativar benefício</button>` : ''}
           ${podeDep ? `<button class="acao discreta" data-dependente="${f.id}">Incluir dependente</button>` : ''}
           <button class="acao discreta risco" data-remover="${f.id}">Remover</button>
         </div>`;
@@ -561,7 +569,7 @@ $('#form-funcionario').addEventListener('submit', ev => {
 });
 
 $('#vista-empresa').addEventListener('click', ev => {
-  const { trocar, remover, dependente } = ev.target.dataset;
+  const { trocar, remover, dependente, suspender, reativar } = ev.target.dataset;
   const empresa = empresaAtual();
 
   if (trocar !== undefined) {
@@ -571,6 +579,19 @@ $('#vista-empresa').addEventListener('click', ev => {
     if (!plano) return;
     executar(() => api(`/empresas/${empresaId}/funcionarios/${trocar}/plano`, 'POST',
       { planoId: plano.id }), `Plano alterado para ${plano.nome}.`);
+  }
+
+  if (suspender !== undefined) {
+    const f = empresa.funcionarios.find(x => x.id === parseInt(suspender));
+    if (!confirm(`Suspender o benefício de ${f.nome} e dos dependentes por inadimplência (RN7)?`)) return;
+    executar(() => api(`/empresas/${empresaId}/funcionarios/${suspender}/suspender`, 'POST'),
+      `Benefício de ${f.nome} suspenso.`);
+  }
+
+  if (reativar !== undefined) {
+    const f = empresa.funcionarios.find(x => x.id === parseInt(reativar));
+    executar(() => api(`/empresas/${empresaId}/funcionarios/${reativar}/reativar`, 'POST'),
+      `Benefício de ${f.nome} reativado.`);
   }
 
   if (dependente !== undefined) {

@@ -86,13 +86,16 @@ public class MontadorDeEstado {
                 List<DependenteDto> deps = new ArrayList<>();
                 for (Dependente d : f.getDependentes()) {
                     deps.add(new DependenteDto(d.getNome(), d.getCpf(), d.getGrauParentesco(),
-                            d.ehElegivel()));
+                            d.ehElegivel(), situacaoDe(repositorio.adesaoDe(d))));
                 }
 
                 funcs.add(new FuncionarioDto(j, f.getNome(), f.getCpf(), f.getMatricula(),
                         ad == null ? null : ad.getPlano().getNome(),
                         f.ehElegivel(),
                         ad != null && ad.getPlano().permiteDependentes(),
+                        situacaoDe(ad),
+                        ad != null && ad.podeSuspender(),
+                        ad != null && ad.podeReativar(),
                         deps));
             }
 
@@ -193,6 +196,11 @@ public class MontadorDeEstado {
      * UC03 7a - um pendente vencido ainda não foi marcado como expirado (isso só
      * acontece quando alguém tenta validá-lo), mas para a tela ele já expirou.
      */
+    /** ATIVA / SUSPENSA / ENCERRADA, ou null se o aluno não tem adesão vigente. */
+    private String situacaoDe(Adesao ad) {
+        return ad == null ? null : ad.getSituacao().name();
+    }
+
     private String situacaoDe(CheckIn c) {
         return c.expirou(LocalDateTime.now())
             ? SituacaoCheckIn.EXPIRADO.name()
