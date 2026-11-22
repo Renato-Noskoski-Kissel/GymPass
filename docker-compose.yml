@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: gympass           # usuário dono do banco
       POSTGRES_PASSWORD: gympass123    # senha desse usuário
     ports:
-      - "5433:5432"                    # porta do SEU computador : porta DENTRO do container
+      - "5434:5432"                    # porta do SEU computador : porta DENTRO do container
     volumes:
       - ./banco:/docker-entrypoint-initdb.d       # scripts que rodam na 1ª inicialização
       - gympass-dados:/var/lib/postgresql/data    # onde os dados ficam guardados
