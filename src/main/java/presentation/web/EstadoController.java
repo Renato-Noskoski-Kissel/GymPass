@@ -3,7 +3,7 @@ package presentation.web;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
+import presentation.web.Dtos.*;
 /**
  * Devolve todo o estado do sistema em uma única requisição.
  *
@@ -21,7 +21,7 @@ public class EstadoController {
     }
 
     @GetMapping("/estado")
-    public Dtos.EstadoDto estado() {
+    public EstadoDto estado() {
         return montador.montar();
     }
 }
