@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*;
 
 /** HU5 - modalidades e instrutores do estabelecimento. */
 @RestController
-@RequestMapping("/api/estabelecimentos/{id}")
+@RequestMapping("/api/estabelecimentos/{cnpj}")
 public class EstabelecimentoController {
 
     private final EstabelecimentoService servico;
@@ -18,22 +18,22 @@ public class EstabelecimentoController {
     public record NovoInstrutor(String nome, String registro, String especialidade) {}
 
     @PostMapping("/modalidades")
-    public void adicionarModalidade(@PathVariable int id, @RequestBody NovaModalidade dados) {
-        servico.adicionarModalidade(id, dados.nome(), dados.descricao());
+    public void adicionarModalidade(@PathVariable String cnpj, @RequestBody NovaModalidade dados) {
+        servico.adicionarModalidade(cnpj, dados.nome(), dados.descricao());
     }
 
     @DeleteMapping("/modalidades/{modalidadeId}")
-    public void removerModalidade(@PathVariable int id, @PathVariable int modalidadeId) {
-        servico.removerModalidade(id, modalidadeId);
+    public void removerModalidade(@PathVariable String cnpj, @PathVariable int modalidadeId) {
+        servico.removerModalidade(cnpj, modalidadeId);
     }
 
     @PostMapping("/instrutores")
-    public void contratarInstrutor(@PathVariable int id, @RequestBody NovoInstrutor dados) {
-        servico.contratarInstrutor(id, dados.nome(), dados.registro(), dados.especialidade());
+    public void contratarInstrutor(@PathVariable String cnpj, @RequestBody NovoInstrutor dados) {
+        servico.contratarInstrutor(cnpj, dados.nome(), dados.registro(), dados.especialidade());
     }
 
-    @DeleteMapping("/instrutores/{instrutorId}")
-    public void desligarInstrutor(@PathVariable int id, @PathVariable int instrutorId) {
-        servico.desligarInstrutor(id, instrutorId);
+    @DeleteMapping("/instrutores/{registro}")
+    public void desligarInstrutor(@PathVariable String cnpj, @PathVariable String registro) {
+        servico.desligarInstrutor(cnpj, registro);
     }
 }

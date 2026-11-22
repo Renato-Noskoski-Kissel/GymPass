@@ -1,9 +1,22 @@
 package dominio.cadastroRede;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "dependentes")
+@PrimaryKeyJoinColumn(name = "cpf")
+@DiscriminatorValue("DEPENDENTE")
 public class Dependente extends Aluno {
 
-    private final String grauParentesco;
-    private final Funcionario responsavel;
+    @Column(name = "grau_parentesco", nullable = false, length = 30)
+    private String grauParentesco;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "responsavel_cpf", nullable = false)
+    private Funcionario responsavel;
+
+    /** Exigido pela JPA. */
+    protected Dependente() { }
 
     public Dependente(String nome, String cpf, String email,
                       String grauParentesco, Funcionario responsavel) {

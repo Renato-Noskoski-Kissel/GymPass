@@ -6,11 +6,14 @@ import dominio.acessoAgenda.Reserva;
 import dominio.cadastroRede.Aluno;
 import dominio.planosAdesao.Adesao;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import persistencia.Repositorio;
 
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+
+import static application.NaoEncontradoException.exigir;
 
 /**
  * UC04a e UC04b - camada de aplicação para reservar e cancelar vaga em aula.
@@ -27,15 +30,21 @@ public class ReservaService {
         this.repositorio = repositorio;
     }
 
-    public Reserva reservarVaga(int alunoId, int aulaId) {
-        Aluno aluno = repositorio.getAlunos().get(alunoId);
-        Aula aula = repositorio.getAulas().get(aulaId);
+    /**
+     * buscarAula trava a linha da aula até o fim desta transação (UC04a 4a):
+     * uma segunda reserva na mesma aula espera esta terminar e só então
+     * conta as vagas, já vendo a reserva gravada aqui.
+     */
+    @Transactional
+    public Reserva reservarVaga(String cpf, int aulaId) {
+        Aluno aluno = aluno(cpf);
+        Aula aula = exigir(repositorio.buscarAula(aulaId), "Aula não encontrada: " + aulaId);
         Adesao adesao = adesaoVigente(aluno);
         YearMonth mesDaAula = YearMonth.from(aula.getDataHoraInicio());
         int reservasNoMes = repositorio.totalReservasNoMes(aluno, mesDaAula);
 
         Reserva reserva = adesao.reservarVaga(aula, reservasNoMes);
-        repositorio.getReservas().add(reserva);
+        repositorio.adicionarReserva(reserva);
         return reserva;
     }
 
@@ -46,9 +55,11 @@ public class ReservaService {
      *        penalizado (extensão 4a.1). Se o prazo passou e ele não confirmou,
      *        nada é cancelado e a tela pede a confirmação.
      */
-    public void cancelarReserva(int alunoId, int reservaId, boolean aceitaPenalidade) {
-        Aluno aluno = repositorio.getAlunos().get(alunoId);
-        Reserva reserva = repositorio.getReservas().get(reservaId);
+    @Transactional
+    public void cancelarReserva(String cpf, int reservaId, boolean aceitaPenalidade) {
+        Aluno aluno = aluno(cpf);
+        Reserva reserva = exigir(repositorio.buscarReserva(reservaId),
+                "Reserva não encontrada: " + reservaId);
         if (reserva.getAluno() != aluno) {
             throw new RegraDeNegocioException("Esta reserva não pertence a " + aluno + ".");
         }
@@ -61,6 +72,10 @@ public class ReservaService {
                 + ". Confirme o cancelamento com penalidade.");
         }
         reserva.cancelar(agora);
+    }
+
+    private Aluno aluno(String cpf) {
+        return exigir(repositorio.buscarAluno(cpf), "Aluno não encontrado: " + cpf);
     }
 
     private Adesao adesaoVigente(Aluno aluno) {

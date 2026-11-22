@@ -2,13 +2,25 @@ package dominio.cadastroRede;
 
 import dominio.RegraDeNegocioException;
 import dominio.acessoAgenda.Aula;
+import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Classe abstrata: todo estabelecimento é uma Academia, um Estudio ou uma Quadra. */
+/**
+ * Classe abstrata: todo estabelecimento é uma Academia, um Estudio ou uma Quadra.
+ *
+ * Persistência: herança em tabela única (estabelecimentos); a coluna "tipo"
+ * diz qual subclasse é a linha.
+ */
+@Entity
+@Table(name = "estabelecimentos")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "tipo", discriminatorType = DiscriminatorType.STRING, length = 20)
 public abstract class Estabelecimento {
 
     /** RN4 - distância máxima entre o aluno e o estabelecimento para aceitar o check-in. */
@@ -18,28 +30,54 @@ public abstract class Estabelecimento {
     public static final int NIVEL_MIN = 1;
     public static final int NIVEL_MAX = 5;
 
-    private final String nomeFantasia;
-    private final String cnpj;
+    @Id
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "cnpj", length = 14)
+    private String cnpj;
+
+    @Column(name = "nome_fantasia", nullable = false, length = 150)
+    private String nomeFantasia;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "situacao_credenciamento", nullable = false, length = 20)
     private SituacaoCredenciamento situacaoCredenciamento;
-    private final double valorPorCheckIn;
+
+    @Column(name = "valor_por_check_in", nullable = false)
+    private double valorPorCheckIn;
 
     /**
      * RF5 - nível de plano exigido para usar este estabelecimento. Um plano de
      * nível igual ou maior cobre o estabelecimento e todas as aulas dele.
      */
-    private final int nivelMinimo;
+    @Column(name = "nivel_minimo", nullable = false)
+    private int nivelMinimo;
 
     /** Composição: o endereço não existe fora do estabelecimento. */
-    private final Endereco endereco;
+    @Embedded
+    private Endereco endereco;
 
-    /** Agregação compartilhada: a modalidade existe independentemente deste estabelecimento. */
-    private final List<Modalidade> modalidades = new ArrayList<>();
+    /**
+     * Composição: cada estabelecimento tem as suas modalidades (modalidades.estabelecimento_cnpj).
+     * Gravadas em cascata; remover da lista apaga a linha (orphanRemoval).
+     */
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "estabelecimento_cnpj", nullable = false)
+    private List<Modalidade> modalidades = new ArrayList<>();
 
-    /** HU5 - instrutores contratados pelo estabelecimento. */
-    private final List<Instrutor> instrutores = new ArrayList<>();
+    /**
+     * HU5 - instrutores contratados pelo estabelecimento.
+     * contratarInstrutor cria o instrutor aqui dentro, então ele é gravado em
+     * cascata; desligar remove a linha (orphanRemoval).
+     */
+    @OneToMany(mappedBy = "estabelecimento", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Instrutor> instrutores = new ArrayList<>();
 
     /** Composição: a aula não existe sem o estabelecimento que a sedia. */
-    private final List<Aula> aulas = new ArrayList<>();
+    @OneToMany(mappedBy = "estabelecimento")
+    private List<Aula> aulas = new ArrayList<>();
+
+    /** Exigido pela JPA. */
+    protected Estabelecimento() { }
 
     protected Estabelecimento(String nomeFantasia, String cnpj, double valorPorCheckIn,
                               int nivelMinimo, Endereco endereco) {
@@ -51,7 +89,7 @@ public abstract class Estabelecimento {
                 "O nível mínimo deve estar entre " + NIVEL_MIN + " e " + NIVEL_MAX + ".");
         }
         this.nomeFantasia = nomeFantasia;
-        this.cnpj = cnpj;
+        this.cnpj = Documentos.cnpj(cnpj);
         this.valorPorCheckIn = valorPorCheckIn;
         this.nivelMinimo = nivelMinimo;
         this.endereco = endereco;

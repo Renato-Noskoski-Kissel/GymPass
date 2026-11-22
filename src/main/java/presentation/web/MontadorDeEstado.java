@@ -20,7 +20,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Converte os objetos de domínio nos DTOs que a tela consome. */
+/**
+ * Converte os objetos de domínio nos DTOs que a tela consome.
+ *
+ * Roda fora dos Services, mas dentro da mesma requisição: com
+ * spring.jpa.open-in-view o contexto de persistência continua aberto até a
+ * resposta ser escrita, então as coleções preguiçosas (modalidades,
+ * funcionários, reservas da aula...) ainda podem ser carregadas aqui.
+ */
 @Component
 public class MontadorDeEstado {
 
@@ -41,24 +48,19 @@ public class MontadorDeEstado {
 
     private List<EstabelecimentoDto> estabelecimentos() {
         List<EstabelecimentoDto> saida = new ArrayList<>();
-        List<Estabelecimento> lista = repositorio.getEstabelecimentos();
-        for (int i = 0; i < lista.size(); i++) {
-            Estabelecimento e = lista.get(i);
-
+        for (Estabelecimento e : repositorio.listarEstabelecimentos()) {
             List<ModalidadeDto> mods = new ArrayList<>();
-            for (int j = 0; j < e.getModalidades().size(); j++) {
-                Modalidade m = e.getModalidades().get(j);
-                mods.add(new ModalidadeDto(j, m.getNome(), m.getDescricao()));
+            for (Modalidade m : e.getModalidades()) {
+                mods.add(new ModalidadeDto(m.getId(), m.getNome(), m.getDescricao()));
             }
 
             List<InstrutorDto> ins = new ArrayList<>();
-            for (int j = 0; j < e.getInstrutores().size(); j++) {
-                Instrutor t = e.getInstrutores().get(j);
-                ins.add(new InstrutorDto(j, t.getNome(), t.getRegistro(), t.getEspecialidade()));
+            for (Instrutor t : e.getInstrutores()) {
+                ins.add(new InstrutorDto(t.getRegistro(), t.getNome(), t.getEspecialidade()));
             }
 
             Endereco end = e.getEndereco();
-            saida.add(new EstabelecimentoDto(i, e.getNomeFantasia(), tipoDe(e),
+            saida.add(new EstabelecimentoDto(e.getCnpj(), e.getNomeFantasia(), tipoDe(e),
                     e.getValorPorCheckIn(), e.getNivelMinimo(), e.getSituacaoCredenciamento().name(),
                     end.toString(), end.getLatitude(), end.getLongitude(), mods, ins));
         }
@@ -74,13 +76,9 @@ public class MontadorDeEstado {
 
     private List<EmpresaDto> empresas() {
         List<EmpresaDto> saida = new ArrayList<>();
-        List<Empresa> lista = repositorio.getEmpresas();
-        for (int i = 0; i < lista.size(); i++) {
-            Empresa emp = lista.get(i);
-
+        for (Empresa emp : repositorio.listarEmpresas()) {
             List<FuncionarioDto> funcs = new ArrayList<>();
-            for (int j = 0; j < emp.getFuncionarios().size(); j++) {
-                Funcionario f = emp.getFuncionarios().get(j);
+            for (Funcionario f : emp.getFuncionarios()) {
                 Adesao ad = repositorio.adesaoDe(f);
 
                 List<DependenteDto> deps = new ArrayList<>();
@@ -89,7 +87,7 @@ public class MontadorDeEstado {
                             d.ehElegivel(), situacaoDe(repositorio.adesaoDe(d))));
                 }
 
-                funcs.add(new FuncionarioDto(j, f.getNome(), f.getCpf(), f.getMatricula(),
+                funcs.add(new FuncionarioDto(f.getCpf(), f.getNome(), f.getMatricula(),
                         ad == null ? null : ad.getPlano().getNome(),
                         f.ehElegivel(),
                         ad != null && ad.getPlano().permiteDependentes(),
@@ -99,7 +97,7 @@ public class MontadorDeEstado {
                         deps));
             }
 
-            saida.add(new EmpresaDto(i, emp.getRazaoSocial(), emp.getLimiteDependentes(),
+            saida.add(new EmpresaDto(emp.getCnpj(), emp.getRazaoSocial(), emp.getLimiteDependentes(),
                     emp.getTotalFuncionarios(), emp.getTotalDependentes(),
                     emp.getTotalBeneficiarios(), funcs));
         }
@@ -108,19 +106,18 @@ public class MontadorDeEstado {
 
     private List<PlanoDto> planos() {
         List<PlanoDto> saida = new ArrayList<>();
-        List<Plano> lista = repositorio.getPlanos();
-        for (int i = 0; i < lista.size(); i++) {
-            Plano p = lista.get(i);
-            saida.add(new PlanoDto(i, p.getNome(), p.getNivel(), p.getValorMensal(),
-                    p.getLimiteAulasMes(), p.permiteDependentes(), coberturaDe(p)));
+        List<Estabelecimento> rede = repositorio.listarEstabelecimentos();
+        for (Plano p : repositorio.listarPlanos()) {
+            saida.add(new PlanoDto(p.getId(), p.getNome(), p.getNivel(), p.getValorMensal(),
+                    p.getLimiteAulasMes(), p.permiteDependentes(), coberturaDe(p, rede)));
         }
         return saida;
     }
 
     /** RF5 - nomes dos estabelecimentos que o nível do plano alcança. */
-    private List<String> coberturaDe(Plano p) {
+    private List<String> coberturaDe(Plano p, List<Estabelecimento> rede) {
         List<String> saida = new ArrayList<>();
-        for (Estabelecimento e : repositorio.getEstabelecimentos()) {
+        for (Estabelecimento e : rede) {
             if (p.libera(e)) saida.add(e.getNomeFantasia());
         }
         return saida;
@@ -128,10 +125,8 @@ public class MontadorDeEstado {
 
     private List<AulaDto> aulas() {
         List<AulaDto> saida = new ArrayList<>();
-        List<Aula> lista = repositorio.getAulas();
-        for (int i = 0; i < lista.size(); i++) {
-            Aula a = lista.get(i);
-            saida.add(new AulaDto(i,
+        for (Aula a : repositorio.listarAulas()) {
+            saida.add(new AulaDto(a.getId(),
                     a.getDataHoraInicio().format(ISO),
                     a.getDataHoraInicio().format(LEGIVEL),
                     a.getDuracao().toMinutes(),
@@ -141,7 +136,7 @@ public class MontadorDeEstado {
                     a.getInstrutor().getNome(),
                     a.estaCancelada(),
                     a.jaComecou(),
-                    repositorio.getEstabelecimentos().indexOf(a.getEstabelecimento()),
+                    a.getEstabelecimento().getCnpj(),
                     a.getEstabelecimento().getNomeFantasia()));
         }
         return saida;
@@ -149,13 +144,11 @@ public class MontadorDeEstado {
 
     private List<AlunoDto> alunos() {
         List<AlunoDto> saida = new ArrayList<>();
-        List<Aluno> lista = repositorio.getAlunos();
         YearMonth mes = YearMonth.now();
-        for (int i = 0; i < lista.size(); i++) {
-            Aluno al = lista.get(i);
+        for (Aluno al : repositorio.listarAlunos()) {
             Adesao ad = repositorio.adesaoDe(al);
             Empresa emp = al.getEmpresaVinculada();
-            saida.add(new AlunoDto(i, al.getNome(),
+            saida.add(new AlunoDto(al.getCpf(), al.getNome(),
                     al instanceof Dependente ? "Dependente" : "Funcionário",
                     emp == null ? null : emp.getRazaoSocial(),
                     ad == null ? null : ad.getPlano().getNome(),
@@ -168,14 +161,12 @@ public class MontadorDeEstado {
 
     private List<CheckInDto> checkIns() {
         List<CheckInDto> saida = new ArrayList<>();
-        List<CheckIn> lista = repositorio.getCheckIns();
         LocalDate hoje = LocalDate.now();
-        for (int i = 0; i < lista.size(); i++) {
-            CheckIn c = lista.get(i);
-            saida.add(new CheckInDto(i,
-                    repositorio.getAlunos().indexOf(c.getAluno()),
+        for (CheckIn c : repositorio.listarCheckIns()) {
+            saida.add(new CheckInDto(c.getId(),
+                    c.getAluno().getCpf(),
                     c.getAluno().getNome(),
-                    repositorio.getEstabelecimentos().indexOf(c.getEstabelecimento()),
+                    c.getEstabelecimento().getCnpj(),
                     c.getEstabelecimento().getNomeFantasia(),
                     c.getDataHora().format(LEGIVEL),
                     c.getDataHora().toLocalDate().equals(hoje),
@@ -209,14 +200,12 @@ public class MontadorDeEstado {
 
     private List<ReservaDto> reservas() {
         List<ReservaDto> saida = new ArrayList<>();
-        List<Reserva> lista = repositorio.getReservas();
         LocalDateTime agora = LocalDateTime.now();
-        for (int i = 0; i < lista.size(); i++) {
-            Reserva r = lista.get(i);
+        for (Reserva r : repositorio.listarReservas()) {
             Aula a = r.getAula();
-            saida.add(new ReservaDto(i,
-                    repositorio.getAlunos().indexOf(r.getAluno()),
-                    repositorio.getAulas().indexOf(a),
+            saida.add(new ReservaDto(r.getId(),
+                    r.getAluno().getCpf(),
+                    a.getId(),
                     a.getModalidade().getNome() + " em " + a.getEstabelecimento().getNomeFantasia(),
                     a.getDataHoraInicio().format(ISO),
                     a.getDataHoraInicio().format(LEGIVEL),

@@ -14,30 +14,30 @@ public class AdministracaoController {
         this.servico = servico;
     }
 
-    public record NovoEstabelecimento(String nome, String tipo, double valorPorCheckIn,
+    public record NovoEstabelecimento(String cnpj, String nome, String tipo, double valorPorCheckIn,
                                       int nivelMinimo, String logradouro, String numero, String bairro,
                                       String cidade, String cep,
                                       double latitude, double longitude) {}
-    public record NovaEmpresa(String razaoSocial, int limiteDependentes, int diaVencimento) {}
+    public record NovaEmpresa(String cnpj, String razaoSocial, int limiteDependentes, int diaVencimento) {}
     public record NovoPlano(String nome, int nivel, double valorMensal,
                             int limiteAulasMes, boolean permiteDependentes) {}
 
     @PostMapping("/estabelecimentos")
     public void cadastrarEstabelecimento(@RequestBody NovoEstabelecimento dados) {
-        servico.cadastrarEstabelecimento(dados.nome(), dados.tipo(), dados.valorPorCheckIn(),
+        servico.cadastrarEstabelecimento(dados.cnpj(), dados.nome(), dados.tipo(), dados.valorPorCheckIn(),
                 dados.nivelMinimo(), dados.logradouro(), dados.numero(), dados.bairro(), dados.cidade(), dados.cep(),
                 dados.latitude(), dados.longitude());
     }
 
-    @PostMapping("/estabelecimentos/{id}/aprovar")
-    public void aprovar(@PathVariable int id) { servico.aprovar(id); }
+    @PostMapping("/estabelecimentos/{cnpj}/aprovar")
+    public void aprovar(@PathVariable String cnpj) { servico.aprovar(cnpj); }
 
-    @PostMapping("/estabelecimentos/{id}/suspender")
-    public void suspender(@PathVariable int id) { servico.suspender(id); }
+    @PostMapping("/estabelecimentos/{cnpj}/suspender")
+    public void suspender(@PathVariable String cnpj) { servico.suspender(cnpj); }
 
     @PostMapping("/empresas")
     public void contratarEmpresa(@RequestBody NovaEmpresa dados) {
-        servico.contratarEmpresa(dados.razaoSocial(), dados.limiteDependentes(),
+        servico.contratarEmpresa(dados.cnpj(), dados.razaoSocial(), dados.limiteDependentes(),
                 dados.diaVencimento());
     }
 

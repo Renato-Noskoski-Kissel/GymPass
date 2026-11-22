@@ -61,6 +61,11 @@
 
           <form class="formulario" id="form-estabelecimento">
             <div class="campo">
+              <label for="est-cnpj">CNPJ</label>
+              <input id="est-cnpj" required inputmode="numeric" placeholder="00.000.000/0001-00"
+                     pattern="\D*(\d\D*){14}" title="14 dígitos, com ou sem pontuação">
+            </div>
+            <div class="campo">
               <label for="est-nome">Nome</label>
               <input id="est-nome" required placeholder="Studio Movimento">
             </div>
@@ -128,6 +133,11 @@
           <div id="lista-empresas" class="lista"></div>
 
           <form class="formulario" id="form-empresa">
+            <div class="campo">
+              <label for="emp-cnpj">CNPJ</label>
+              <input id="emp-cnpj" required inputmode="numeric" placeholder="00.000.000/0001-00"
+                     pattern="\D*(\d\D*){14}" title="14 dígitos, com ou sem pontuação">
+            </div>
             <div class="campo">
               <label for="emp-nome">Razão social</label>
               <input id="emp-nome" required placeholder="Tech Ltda">

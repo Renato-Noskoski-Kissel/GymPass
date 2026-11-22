@@ -14,16 +14,16 @@ public class ReservaController {
         this.servico = servico;
     }
 
-    public record NovaReserva(int alunoId, int aulaId) {}
-    public record Cancelamento(int alunoId, boolean aceitaPenalidade) {}
+    public record NovaReserva(String cpf, int aulaId) {}
+    public record Cancelamento(String cpf, boolean aceitaPenalidade) {}
 
     @PostMapping
     public void reservarVaga(@RequestBody NovaReserva dados) {
-        servico.reservarVaga(dados.alunoId(), dados.aulaId());
+        servico.reservarVaga(dados.cpf(), dados.aulaId());
     }
 
     @PostMapping("/{id}/cancelar")
     public void cancelarReserva(@PathVariable int id, @RequestBody Cancelamento dados) {
-        servico.cancelarReserva(dados.alunoId(), id, dados.aceitaPenalidade());
+        servico.cancelarReserva(dados.cpf(), id, dados.aceitaPenalidade());
     }
 }

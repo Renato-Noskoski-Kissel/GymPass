@@ -1,0 +1,494 @@
+@startuml
+scale 0.5
+skinparam dpi 150
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam nodesep 45
+skinparam ranksep 70
+hide circle
+title Diagrama de Classes de Projeto — Iterações 1, 2 e 3
+
+' =====================================================================
+' FACHADA DOS CONTROLLERS (presentation.web)
+' =====================================================================
+class Controllers <<fachada>> {
+  -servico : Services
+  .. AdministracaoController ..
+  +cadastrarEstabelecimento(dados : NovoEstabelecimento) : void
+  +aprovar(cnpj : String) : void
+  +suspender(cnpj : String) : void
+  +contratarEmpresa(dados : NovaEmpresa) : void
+  +criarPlano(dados : NovoPlano) : void
+  .. AulaController ..
+  +agendar(dados : NovaAula) : void
+  +trocarInstrutor(id : int, dados : TrocaDeInstrutor) : void
+  +alterarCapacidade(id : int, dados : NovaCapacidade) : void
+  +cancelar(id : int) : void
+  .. CheckInController ..
+  +realizarCheckIn(dados : NovoCheckIn) : void
+  .. EmpresaController ..
+  +incluirFuncionario(cnpjEmpresa : String, dados : NovoFuncionario) : void
+  +trocarPlano(cnpjEmpresa : String, cpf : String, dados : TrocaDePlano) : void
+  +incluirDependente(cnpjEmpresa : String, cpfFuncionario : String, dados : NovoDependente) : void
+  +removerFuncionario(cnpjEmpresa : String, cpf : String) : void
+  +suspenderBeneficio(cnpjEmpresa : String, cpf : String) : void
+  +reativarBeneficio(cnpjEmpresa : String, cpf : String) : void
+  .. EstabelecimentoController ..
+  +adicionarModalidade(cnpj : String, dados : NovaModalidade) : void
+  +removerModalidade(cnpj : String, modalidadeId : int) : void
+  +contratarInstrutor(cnpj : String, dados : NovoInstrutor) : void
+  +desligarInstrutor(cnpj : String, registro : String) : void
+  .. RecepcaoController ..
+  +localizar(cnpj : String, codigo : String) : ConferenciaDto
+  +localizarPorCpf(cnpj : String, cpf : String) : ConferenciaDto
+  +validar(cnpj : String, codigo : String) : void
+  +recusar(cnpj : String, codigo : String, dados : Recusa) : void
+  .. ReservaController ..
+  +reservarVaga(dados : NovaReserva) : void
+  +cancelarReserva(id : int, dados : Cancelamento) : void
+}
+
+' =====================================================================
+' FACHADA DOS SERVICES (application)
+' =====================================================================
+class Services <<fachada>> {
+  -repositorio : Repositorio
+  .. agendamento (GradeService, ReservaService) ..
+  +agendar(cnpj : String, modalidadeId : int, registroInstrutor : String, inicio : String, duracaoMin : long, capacidade : int) : void
+  +trocarInstrutor(aulaId : int, registroInstrutor : String) : void
+  +alterarCapacidade(aulaId : int, capacidade : int) : void
+  +cancelar(aulaId : int) : void
+  +reservarVaga(cpf : String, aulaId : int) : Reserva
+  +cancelarReserva(cpf : String, reservaId : int, aceitaPenalidade : boolean) : void
+  .. controleDeAcesso (CheckInService) ..
+  +realizarCheckIn(cpf : String, cnpj : String, latitude : double, longitude : double) : CheckIn
+  +localizarNaRecepcao(cnpj : String, codigo : String) : CheckIn
+  +localizarPorCpfNaRecepcao(cnpj : String, cpf : String) : CheckIn
+  +validarCheckIn(cnpj : String, codigo : String) : void
+  +recusarCheckIn(cnpj : String, codigo : String, motivo : String) : void
+  .. gestaoDeParceiros (GestaoParceirosService, EstabelecimentoService) ..
+  +cadastrarEstabelecimento(cnpj : String, nome : String, tipo : String, valorPorCheckIn : double, nivelMinimo : int, logradouro : String, numero : String, bairro : String, cidade : String, cep : String, latitude : double, longitude : double) : void
+  +aprovar(cnpj : String) : void
+  +suspender(cnpj : String) : void
+  +contratarEmpresa(cnpj : String, razaoSocial : String, limiteDependentes : int, diaVencimento : int) : void
+  +criarPlano(nome : String, nivel : int, valorMensal : double, limiteAulasMes : int, permiteDependentes : boolean) : void
+  +adicionarModalidade(cnpj : String, nome : String, descricao : String) : void
+  +removerModalidade(cnpj : String, modalidadeId : int) : void
+  +contratarInstrutor(cnpj : String, nome : String, registro : String, especialidade : String) : void
+  +desligarInstrutor(cnpj : String, registro : String) : void
+  .. plano (BeneficiariosService) ..
+  +incluirFuncionario(cnpjEmpresa : String, nome : String, cpf : String, matricula : String, planoId : int) : void
+  +trocarPlano(cnpjEmpresa : String, cpf : String, planoId : int) : void
+  +incluirDependente(cnpjEmpresa : String, cpfFuncionario : String, nome : String, cpf : String, grauParentesco : String) : void
+  +removerFuncionario(cnpjEmpresa : String, cpf : String) : void
+  +suspenderAdesao(cnpjEmpresa : String, cpf : String) : void
+  +reativarAdesao(cnpjEmpresa : String, cpf : String) : void
+  .. auxiliares ..
+  -adesaoVigente(aluno : Aluno) : Adesao
+  -adesaoVigente(cnpjEmpresa : String, cpf : String) : Adesao
+  -exigirCpfLivre(cpf : String) : void
+}
+
+' =====================================================================
+' PERSISTÊNCIA
+' =====================================================================
+interface Repositorio {
+  .. Estabelecimento ..
+  +buscarEstabelecimento(cnpj : String) : Estabelecimento
+  +listarEstabelecimentos() : List<Estabelecimento>
+  +adicionarEstabelecimento(e : Estabelecimento) : void
+  .. Empresa ..
+  +buscarEmpresa(cnpj : String) : Empresa
+  +listarEmpresas() : List<Empresa>
+  +adicionarEmpresa(e : Empresa) : void
+  .. Plano ..
+  +buscarPlano(id : int) : Plano
+  +listarPlanos() : List<Plano>
+  +adicionarPlano(p : Plano) : void
+  .. Aula ..
+  +buscarAula(id : int) : Aula
+  +listarAulas() : List<Aula>
+  +adicionarAula(a : Aula) : void
+  .. Aluno ..
+  +buscarAluno(cpf : String) : Aluno
+  +listarAlunos() : List<Aluno>
+  +adicionarAluno(a : Aluno) : void
+  .. Adesao ..
+  +adesaoDe(aluno : Aluno) : Adesao
+  +adicionarAdesao(a : Adesao) : void
+  .. Reserva ..
+  +buscarReserva(id : int) : Reserva
+  +listarReservas() : List<Reserva>
+  +totalReservasNoMes(aluno : Aluno, mes : YearMonth) : int
+  +adicionarReserva(r : Reserva) : void
+  .. CheckIn ..
+  +ultimoCheckInDe(aluno : Aluno) : CheckIn
+  +checkInPorCodigo(codigo : String) : CheckIn
+  +listarCheckIns() : List<CheckIn>
+  +adicionarCheckIn(c : CheckIn) : void
+}
+
+class RepositorioPostgres {
+  -estabelecimentos : EstabelecimentoJpa
+  -empresas : EmpresaJpa
+  -planos : PlanoJpa
+  -aulas : AulaJpa
+  -alunos : AlunoJpa
+  -adesoes : AdesaoJpa
+  -reservas : ReservaJpa
+  -checkIns : CheckInJpa
+}
+
+interface JpaRepository<T, ID> <<Spring Data>> {
+  +save(entidade : T) : T
+  +findById(id : ID) : Optional<T>
+  +findAll() : List<T>
+}
+
+note bottom of RepositorioPostgres
+  Cada XxxJpa estende JpaRepository<X, K>, onde K é o
+  tipo da chave: String (cnpj, cpf, registro) ou Integer (id).
+  O Spring Data gera a implementação.
+  buscarAula() aplica lock pessimista na linha
+  da aula, no lugar do synchronized (UC04a 4a).
+end note
+
+' =====================================================================
+' PLANOS E ADESÃO
+' =====================================================================
+package "Planos e Adesão" {
+  class Plano {
+    -id : Integer {id}
+    -nome : String
+    -nivel : int
+    -valorMensal : double
+    -limiteAulasMes : int
+    -permiteDependentes : boolean
+    -empresasQueOferecem : List<Empresa>
+    +oferecerPara(e : Empresa) : void
+    +ehOferecidoPor(e : Empresa) : boolean
+    +libera(e : Estabelecimento) : boolean
+    +permiteDependentes() : boolean
+    +getNome() : String
+    +getNivel() : int
+    +getLimiteAulasMes() : int
+  }
+
+  class Adesao <<context>> {
+    -id : Integer {id}
+    -aluno : Aluno
+    -plano : Plano
+    -dataInicio : LocalDate
+    -dataFim : LocalDate
+    -estado : EstadoAdesao
+    {static} +cadastrarBeneficiario(f : Funcionario, p : Plano) : Adesao
+    {static} +trocarPlano(atual : Adesao, novo : Plano) : Adesao
+    +incluirDependente(d : Dependente) : Adesao
+    +registrarCheckIn(e : Estabelecimento, lat : double, lng : double, ultimo : CheckIn) : CheckIn
+    +reservarVaga(a : Aula, reservasMes : int) : Reserva
+    +estaVigente() : boolean
+    +podeSuspender() : boolean
+    +podeReativar() : boolean
+    +suspender() : void
+    +reativar() : void
+    +encerrar() : void
+    +estaAtiva() : boolean
+    ~mudarPara(novoEstado : EstadoAdesao) : void
+    ~registrarFim(data : LocalDate) : void
+    +getAluno() : Aluno
+    +getPlano() : Plano
+    +getDataInicio() : LocalDate
+    +getDataFim() : LocalDate
+    +getSituacao() : SituacaoAdesao
+  }
+
+  interface EstadoAdesao <<state>> {
+    +incluirDependente(ad : Adesao, d : Dependente) : Adesao
+    +registrarCheckIn(ad : Adesao, e : Estabelecimento, lat : double, lng : double, ultimo : CheckIn) : CheckIn
+    +reservarVaga(ad : Adesao, a : Aula, reservasMes : int) : Reserva
+    +trocarPlano(ad : Adesao, novoPlano : Plano) : Adesao
+    +suspender(ad : Adesao) : void
+    +reativar(ad : Adesao) : void
+    +encerrar(ad : Adesao) : void
+    +estaAtiva() : boolean
+    +estaVigente() : boolean
+    +podeSuspender() : boolean
+    +podeReativar() : boolean
+    +situacao() : SituacaoAdesao
+  }
+
+  together {
+    class Ativa
+    class Suspensa
+    class Encerrada
+  }
+
+  enum SituacaoAdesao {
+    ATIVA
+    SUSPENSA
+    ENCERRADA
+  }
+
+  Adesao "1" o--> "1" EstadoAdesao : estado atual >
+  EstadoAdesao <|.. Ativa
+  EstadoAdesao <|.. Suspensa
+  EstadoAdesao <|.. Encerrada
+
+  EstadoAdesao ..> SituacaoAdesao
+  Adesao ..> SituacaoAdesao
+}
+
+' =====================================================================
+' CADASTRO E REDE
+' =====================================================================
+package "Cadastro e Rede" {
+  class Empresa {
+    -cnpj : String {id}
+    -razaoSocial : String
+    -dataContrato : LocalDate
+    -limiteDependentes : int
+    -diaVencimentoFatura : int
+    -funcionarios : List<Funcionario>
+    +incluirFuncionario(f : Funcionario) : void
+    +removerFuncionario(f : Funcionario) : void
+    +possuiFuncionario(f : Funcionario) : boolean
+    +getFuncionarios() : List<Funcionario>
+    +getLimiteDependentes() : int
+    +getTotalFuncionarios() : int
+    +getTotalDependentes() : int
+    +getTotalBeneficiarios() : int
+  }
+
+  abstract class Aluno {
+    -cpf : String {id}
+    -nome : String
+    -email : String
+    -dataCadastro : LocalDate
+    -situacao : SituacaoAluno
+    +temCpf(cpf : String) : boolean
+    +estaAtivo() : boolean
+    +bloquear() : void
+    +reativar() : void
+    +inativar() : void
+    {abstract} +ehElegivel() : boolean
+    {abstract} +getEmpresaVinculada() : Empresa
+  }
+
+  together {
+    class Funcionario {
+      -matricula : String
+      -dataAdmissao : LocalDate
+      -empresa : Empresa
+      -dependentes : List<Dependente>
+      +ehElegivel() : boolean
+      +getEmpresaVinculada() : Empresa
+      ~desvincular() : void
+      +vincularDependente(d : Dependente) : void
+      +removerDependente(d : Dependente) : void
+      +getDependentes() : List<Dependente>
+    }
+
+    class Dependente {
+      -grauParentesco : String
+      -responsavel : Funcionario
+      +ehElegivel() : boolean
+      +getEmpresaVinculada() : Empresa
+      +getResponsavel() : Funcionario
+    }
+  }
+
+  abstract class Estabelecimento {
+    -cnpj : String {id}
+    -nomeFantasia : String
+    -situacaoCredenciamento : SituacaoCredenciamento
+    -valorPorCheckIn : double
+    -nivelMinimo : int
+    -endereco : Endereco
+    -modalidades : List<Modalidade>
+    -instrutores : List<Instrutor>
+    -aulas : List<Aula>
+    +aprovarCredenciamento() : void
+    +suspenderCredenciamento() : void
+    +estaCredenciado() : boolean
+    +estaNoRaio(lat : double, lng : double) : boolean
+    +adicionarModalidade(m : Modalidade) : void
+    +removerModalidade(m : Modalidade) : void
+    +oferece(m : Modalidade) : boolean
+    +getModalidades() : List<Modalidade>
+    +contratarInstrutor(nome : String, registro : String, especialidade : String) : Instrutor
+    +desligarInstrutor(i : Instrutor) : void
+    +getInstrutores() : List<Instrutor>
+    +agendarAula(inicio : LocalDateTime, duracao : Duration, capacidade : int, m : Modalidade, i : Instrutor) : Aula
+    +getNivelMinimo() : int
+    +getEndereco() : Endereco
+  }
+
+  together {
+    class Academia {
+      -funciona24Horas : boolean
+    }
+    class Estudio {
+      -capacidadePadraoTurma : int
+    }
+    class Quadra {
+      -coberta : boolean
+    }
+  }
+
+  class Endereco {
+    -logradouro : String
+    -numero : String
+    -bairro : String
+    -cidade : String
+    -cep : String
+    -latitude : double
+    -longitude : double
+    +distanciaAte(lat : double, lng : double) : double
+  }
+
+  class Modalidade {
+    -id : Integer {id}
+    -nome : String
+    -descricao : String
+  }
+
+  class Instrutor {
+    -registro : String {id}
+    -nome : String
+    -especialidade : String
+    -estabelecimento : Estabelecimento
+    +trabalhaEm(e : Estabelecimento) : boolean
+  }
+}
+
+' =====================================================================
+' ACESSO E AGENDA
+' =====================================================================
+package "Acesso e Agenda" {
+  class Aula {
+    -id : Integer {id}
+    -dataHoraInicio : LocalDateTime
+    -duracao : Duration
+    -capacidadeMaxima : int
+    -cancelada : boolean
+    -estabelecimento : Estabelecimento
+    -modalidade : Modalidade
+    -instrutor : Instrutor
+    -reservas : List<Reserva>
+    {static} -validar(inicio : LocalDateTime, capacidade : int, e : Estabelecimento, m : Modalidade, i : Instrutor) : void
+    +atribuirInstrutor(i : Instrutor) : void
+    +alterarCapacidade(c : int) : void
+    +reagendar(inicio : LocalDateTime, duracao : Duration) : void
+    +cancelar() : void
+    +estaCancelada() : boolean
+    +jaComecou() : boolean
+    +vagasDisponiveis() : int
+    +reservar(al : Aluno) : Reserva
+    -reservaConfirmadaDe(al : Aluno) : Reserva
+    +getEstabelecimento() : Estabelecimento
+    +getModalidade() : Modalidade
+    +getDataHoraInicio() : LocalDateTime
+  }
+
+  class Reserva {
+    -id : Integer {id}
+    -dataHoraReserva : LocalDateTime
+    -situacao : SituacaoReserva
+    -penalizada : boolean
+    -aluno : Aluno
+    -aula : Aula
+    ~Reserva(al : Aluno, a : Aula)
+    +prazoSemPenalidade() : LocalDateTime
+    +cancelamentoSeriaPenalizado(momento : LocalDateTime) : boolean
+    +cancelar(momento : LocalDateTime) : void
+    +isPenalizada() : boolean
+    +getDataHoraReserva() : LocalDateTime
+    +getSituacao() : SituacaoReserva
+    +getAluno() : Aluno
+    +getAula() : Aula
+  }
+
+  class CheckIn {
+    -id : Integer {id}
+    -dataHora : LocalDateTime
+    -latitudeOrigem : double
+    -longitudeOrigem : double
+    -situacaoValidacao : SituacaoCheckIn
+    -codigo : String
+    -motivoRecusa : String
+    -aluno : Aluno
+    -estabelecimento : Estabelecimento
+    +CheckIn(al : Aluno, e : Estabelecimento, lat : double, lng : double)
+    {static} -gerarCodigo() : String
+    +prazoValidacao() : LocalDateTime
+    +expirou(momento : LocalDateTime) : boolean
+    +expirar() : void
+    +conferirNaRecepcao(recepcao : Estabelecimento) : void
+    +validar() : void
+    +recusar(motivo : String) : void
+    +getCodigo() : String
+    +getAluno() : Aluno
+    +getEstabelecimento() : Estabelecimento
+    +getDataHora() : LocalDateTime
+    +getSituacaoValidacao() : SituacaoCheckIn
+  }
+}
+
+' =====================================================================
+' CAMADAS
+' =====================================================================
+Controllers --> Services : usa >
+Services --> Repositorio : consulta >
+Repositorio <|.. RepositorioPostgres
+RepositorioPostgres "1" --> "8" JpaRepository : delega >
+
+' =====================================================================
+' REPOSITÓRIO -> RAÍZES (dependência: só parâmetro e retorno)
+' =====================================================================
+Repositorio ..> Empresa
+Repositorio ..> Estabelecimento
+Repositorio ..> Plano
+Repositorio ..> Adesao
+Repositorio ..> Aluno
+Repositorio ..> Aula
+Repositorio ..> Reserva
+Repositorio ..> CheckIn
+
+' =====================================================================
+' HERANÇAS
+' =====================================================================
+Aluno <|-- Funcionario
+Aluno <|-- Dependente
+Estabelecimento <|-- Academia
+Estabelecimento <|-- Estudio
+Estabelecimento <|-- Quadra
+
+' =====================================================================
+' CADASTRO E REDE
+' =====================================================================
+Empresa "1" <--> "0..*" Funcionario : emprega >
+Funcionario "1" <--> "0..*" Dependente : responsável-por >
+Estabelecimento "1" *--> "1" Endereco : localiza-se-em >
+Estabelecimento "1" *--> "0..*" Modalidade : oferece >
+Estabelecimento "1" <--> "0..*" Instrutor : contrata >
+
+' =====================================================================
+' PLANOS E ADESÃO
+' =====================================================================
+Adesao "1..*\n{no máx. 1 vigente}" --> "1" Aluno : concedida-a >
+Adesao "0..*" --> "1" Plano : refere-se-a >
+Plano "0..*" --> "0..*" Empresa : oferecido-por >
+Plano ..> Estabelecimento : libera por nível >
+
+' =====================================================================
+' ACESSO E AGENDA
+' =====================================================================
+Estabelecimento "1" *-- "0..*" Aula : sedia >
+Aula "0..*" --> "1" Modalidade : classificada-por >
+Aula "0..*" --> "1" Instrutor : ministrada-por >
+Aula "1" *-- "0..*" Reserva : recebe >
+Reserva "0..*" --> "1" Aluno : feita-por >
+CheckIn "0..*" --> "1" Aluno : realizado-por >
+CheckIn "0..*" --> "1" Estabelecimento : recebido-por >
+@enduml

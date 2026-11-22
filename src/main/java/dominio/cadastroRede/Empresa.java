@@ -1,26 +1,49 @@
 package dominio.cadastroRede;
 
 import dominio.RegraDeNegocioException;
+import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+@Entity
+@Table(name = "empresas")
 public class Empresa {
 
-    private final String razaoSocial;
-    private final String cnpj;
-    private final LocalDate dataContrato;
-    private final int limiteDependentes;
-    private final int diaVencimentoFatura;
+    @Id
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "cnpj", length = 14)
+    private String cnpj;
 
-    /** HU2 / RF10 - quadro de beneficiários. */
-    private final List<Funcionario> funcionarios = new ArrayList<>();
+    @Column(name = "razao_social", nullable = false, length = 150)
+    private String razaoSocial;
+
+    @Column(name = "data_contrato", nullable = false)
+    private LocalDate dataContrato;
+
+    @Column(name = "limite_dependentes", nullable = false)
+    private int limiteDependentes;
+
+    @Column(name = "dia_vencimento_fatura", nullable = false)
+    private int diaVencimentoFatura;
+
+    /**
+     * HU2 / RF10 - quadro de beneficiários.
+     * Lado inverso: quem grava é Funcionario.empresa (coluna funcionarios.empresa_cnpj).
+     */
+    @OneToMany(mappedBy = "empresa")
+    private List<Funcionario> funcionarios = new ArrayList<>();
+
+    /** Exigido pela JPA. */
+    protected Empresa() { }
 
     public Empresa(String razaoSocial, String cnpj, LocalDate dataContrato,
                    int limiteDependentes, int diaVencimentoFatura) {
         this.razaoSocial = razaoSocial;
-        this.cnpj = cnpj;
+        this.cnpj = Documentos.cnpj(cnpj);
         this.dataContrato = dataContrato;
         this.limiteDependentes = limiteDependentes;
         this.diaVencimentoFatura = diaVencimentoFatura;

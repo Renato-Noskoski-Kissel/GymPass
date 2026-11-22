@@ -3,6 +3,7 @@ package dominio.acessoAgenda;
 import dominio.RegraDeNegocioException;
 import dominio.cadastroRede.Aluno;
 import dominio.cadastroRede.Estabelecimento;
+import jakarta.persistence.*;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 
@@ -18,6 +19,8 @@ import java.time.LocalDateTime;
  * As coordenadas de origem ficam registradas, mas não são expostas à empresa
  * contratante (RNF3).
  */
+@Entity
+@Table(name = "check_ins")
 public class CheckIn {
 
     /** Sem 0/O, 1/I/L: o código é lido em voz alta ou digitado na recepção. */
@@ -25,14 +28,42 @@ public class CheckIn {
     private static final int TAMANHO_CODIGO = 6;
     private static final SecureRandom SORTEIO = new SecureRandom();
 
-    private final LocalDateTime dataHora;
-    private final double latitudeOrigem;
-    private final double longitudeOrigem;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Integer id;
+
+    @Column(name = "data_hora", nullable = false)
+    private LocalDateTime dataHora;
+
+    @Column(name = "latitude_origem", nullable = false)
+    private double latitudeOrigem;
+
+    @Column(name = "longitude_origem", nullable = false)
+    private double longitudeOrigem;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "situacao_validacao", nullable = false, length = 20)
     private SituacaoCheckIn situacaoValidacao;
-    private final String codigo;
+
+    @Column(name = "codigo", nullable = false, length = 6)
+    private String codigo;
+
+    @Column(name = "motivo_recusa", length = 255)
     private String motivoRecusa;
-    private final Aluno aluno;
-    private final Estabelecimento estabelecimento;
+
+    /** EAGER: Aluno é abstrata; carregar já a subclasse real evita proxy. */
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "aluno_cpf", nullable = false)
+    private Aluno aluno;
+
+    /** EAGER: Estabelecimento é abstrata; carregar já a subclasse real evita proxy. */
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "estabelecimento_cnpj", nullable = false)
+    private Estabelecimento estabelecimento;
+
+    /** Exigido pela JPA. */
+    protected CheckIn() { }
 
     public CheckIn(Aluno aluno, Estabelecimento estabelecimento,
                    double latitudeOrigem, double longitudeOrigem) {
@@ -98,7 +129,8 @@ public class CheckIn {
 
     /**
      * Validar e recusar só valem para check-in pendente e dentro do prazo.
-     * Um pendente vencido expira aqui mesmo e a operação é rejeitada (UC07 3b).
+     * Um pendente vencido expira aqui mesmo e a operação é rejeitada (UC07 3b)
+     * com CheckInExpiradoException, para que a expiração fique gravada.
      */
     private void exigirPendente() {
         if (expirou(LocalDateTime.now())) {
@@ -108,11 +140,11 @@ public class CheckIn {
             case PENDENTE -> { }
             case VALIDADO -> throw new RegraDeNegocioException("Este check-in já foi validado.");
             case RECUSADO -> throw new RegraDeNegocioException("Este check-in já foi recusado.");
-            case EXPIRADO -> throw new RegraDeNegocioException(
-                "Este check-in expirou. Peça ao aluno para fazer um novo check-in.");
+            case EXPIRADO -> throw new CheckInExpiradoException();
         }
     }
 
+    public Integer getId() { return id; }
     public LocalDateTime getDataHora() { return dataHora; }
     public double getLatitudeOrigem() { return latitudeOrigem; }
     public double getLongitudeOrigem() { return longitudeOrigem; }

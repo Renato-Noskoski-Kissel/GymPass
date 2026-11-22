@@ -1,11 +1,15 @@
 package application.gestaoDeParceiros;
 
+import dominio.RegraDeNegocioException;
 import dominio.cadastroRede.*;
 import dominio.planosAdesao.Plano;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import persistencia.Repositorio;
 
 import java.time.LocalDate;
+
+import static application.NaoEncontradoException.exigir;
 
 /**
  * HU4 - camada de aplicação para cadastro de parceiros e configuração de planos.
@@ -22,11 +26,15 @@ public class GestaoParceirosService {
         this.repositorio = repositorio;
     }
 
-    public void cadastrarEstabelecimento(String nome, String tipo, double valorPorCheckIn,
+    @Transactional
+    public void cadastrarEstabelecimento(String cnpj, String nome, String tipo, double valorPorCheckIn,
                                          int nivelMinimo, String logradouro, String numero, String bairro,
                                          String cidade, String cep,
                                          double latitude, double longitude) {
-        String cnpj = "00.000.000/0001-00";
+        Estabelecimento existente = repositorio.buscarEstabelecimento(cnpj);
+        if (existente != null) {
+            throw new RegraDeNegocioException("O CNPJ já está cadastrado para " + existente + ".");
+        }
         Endereco endereco = new Endereco(logradouro, numero, bairro, cidade, cep,
                 latitude, longitude);
         Estabelecimento novo = switch (tipo) {
@@ -34,28 +42,41 @@ public class GestaoParceirosService {
             case "Quadra"   -> new Quadra(nome, cnpj, valorPorCheckIn, nivelMinimo, endereco, false);
             default         -> new Estudio(nome, cnpj, valorPorCheckIn, nivelMinimo, endereco, 15);
         };
-        repositorio.getEstabelecimentos().add(novo);
+        repositorio.adicionarEstabelecimento(novo);
     }
 
-    public void aprovar(int id) {
-        repositorio.getEstabelecimentos().get(id).aprovarCredenciamento();
+    @Transactional
+    public void aprovar(String cnpj) {
+        estabelecimento(cnpj).aprovarCredenciamento();
     }
 
-    public void suspender(int id) {
-        repositorio.getEstabelecimentos().get(id).suspenderCredenciamento();
+    @Transactional
+    public void suspender(String cnpj) {
+        estabelecimento(cnpj).suspenderCredenciamento();
     }
 
-    public void contratarEmpresa(String razaoSocial, int limiteDependentes, int diaVencimento) {
-        Empresa empresa = new Empresa(razaoSocial, "00.000.000/0001-00",
-                LocalDate.now(), limiteDependentes, diaVencimento);
-        repositorio.getPlanos().forEach(plano -> plano.oferecerPara(empresa));
-        repositorio.getEmpresas().add(empresa);
+    @Transactional
+    public void contratarEmpresa(String cnpj, String razaoSocial, int limiteDependentes, int diaVencimento) {
+        Empresa existente = repositorio.buscarEmpresa(cnpj);
+        if (existente != null) {
+            throw new RegraDeNegocioException("O CNPJ já está cadastrado para " + existente + ".");
+        }
+        Empresa empresa = new Empresa(razaoSocial, cnpj, LocalDate.now(),
+                limiteDependentes, diaVencimento);
+        repositorio.adicionarEmpresa(empresa);
+        repositorio.listarPlanos().forEach(plano -> plano.oferecerPara(empresa));
     }
 
+    @Transactional
     public void criarPlano(String nome, int nivel, double valorMensal,
                            int limiteAulasMes, boolean permiteDependentes) {
         Plano plano = new Plano(nome, nivel, valorMensal, limiteAulasMes, permiteDependentes);
-        repositorio.getEmpresas().forEach(plano::oferecerPara);
-        repositorio.getPlanos().add(plano);
+        repositorio.listarEmpresas().forEach(plano::oferecerPara);
+        repositorio.adicionarPlano(plano);
+    }
+
+    private Estabelecimento estabelecimento(String cnpj) {
+        return exigir(repositorio.buscarEstabelecimento(cnpj),
+                "Estabelecimento não encontrado: " + cnpj);
     }
 }

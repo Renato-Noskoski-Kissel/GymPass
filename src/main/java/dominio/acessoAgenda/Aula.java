@@ -5,6 +5,7 @@ import dominio.cadastroRede.Aluno;
 import dominio.cadastroRede.Estabelecimento;
 import dominio.cadastroRede.Instrutor;
 import dominio.cadastroRede.Modalidade;
+import jakarta.persistence.*;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -22,20 +23,47 @@ import java.util.List;
  * Composição com Reserva: a aula cria e guarda as próprias reservas, e é
  * quem garante que elas nunca passem da capacidade (UC04a).
  */
+@Entity
+@Table(name = "aulas")
 public class Aula {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Integer id;
+
+    @Column(name = "data_hora_inicio", nullable = false)
     private LocalDateTime dataHoraInicio;
+
+    /** Gravada em minutos pelo persistencia.ConversorDuracaoMinutos (autoApply). */
+    @Column(name = "duracao_minutos", nullable = false)
     private Duration duracao;
+
+    @Column(name = "capacidade_maxima", nullable = false)
     private int capacidadeMaxima;
 
-    private final Estabelecimento estabelecimento;
+    /** EAGER: Estabelecimento é abstrata; carregar já a subclasse real evita proxy. */
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "estabelecimento_cnpj", nullable = false)
+    private Estabelecimento estabelecimento;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "modalidade_id", nullable = false)
     private Modalidade modalidade;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "instrutor_registro", nullable = false)
     private Instrutor instrutor;
 
+    @Column(name = "cancelada", nullable = false)
     private boolean cancelada;
 
-    /** UC04a - reservas feitas para esta aula. */
-    private final List<Reserva> reservas = new ArrayList<>();
+    /** UC04a - reservas feitas para esta aula. Lado inverso de Reserva.aula. */
+    @OneToMany(mappedBy = "aula")
+    private List<Reserva> reservas = new ArrayList<>();
+
+    /** Exigido pela JPA. */
+    protected Aula() { }
 
     public Aula(LocalDateTime dataHoraInicio, Duration duracao, int capacidadeMaxima,
                 Estabelecimento estabelecimento, Modalidade modalidade, Instrutor instrutor) {
@@ -81,11 +109,15 @@ public class Aula {
      * cobertura do plano e limite mensal são verificados antes, por
      * Adesao.reservarVaga — use aquele método, não este diretamente.
      *
-     * synchronized: a verificação de vaga e a inclusão da reserva acontecem como
-     * um passo só, então duas requisições simultâneas não disputam a última vaga
-     * (extensão 4a).
+     * Extensão 4a (duas pessoas disputando a última vaga): quem garante que a
+     * verificação de vaga e a inclusão da reserva aconteçam como um passo só é
+     * a persistência. Repositorio.buscarAula trava a linha da aula no banco
+     * (SELECT ... FOR UPDATE) até o fim da transação; uma segunda reserva na
+     * mesma aula espera e, ao continuar, já enxerga a reserva gravada.
+     * Um synchronized aqui não serviria: cada requisição carrega a sua
+     * própria instância de Aula, então não haveria trava em comum.
      */
-    public synchronized Reserva reservar(Aluno aluno) {
+    public Reserva reservar(Aluno aluno) {
         if (cancelada) {
             throw new RegraDeNegocioException("A aula foi cancelada pelo estabelecimento.");
         }
@@ -120,7 +152,7 @@ public class Aula {
     }
 
     /** UC04a passo 3 - capacidade menos as reservas que ocupam vaga (todas, menos as canceladas). */
-    public synchronized int vagasDisponiveis() {
+    public int vagasDisponiveis() {
         int ocupadas = 0;
         for (Reserva r : reservas) {
             if (r.getSituacao() != SituacaoReserva.CANCELADA) {
@@ -142,8 +174,9 @@ public class Aula {
     /**
      * HU1 - ajuste do limite de vagas. Não pode ficar abaixo das vagas já
      * reservadas: as reservas confirmadas nunca excedem a capacidade (UC04a).
+     * Também passa por buscarAula, então não corre junto com uma reserva.
      */
-    public synchronized void alterarCapacidade(int novaCapacidade) {
+    public void alterarCapacidade(int novaCapacidade) {
         if (novaCapacidade <= 0) {
             throw new RegraDeNegocioException("A capacidade da aula deve ser maior que zero.");
         }
@@ -175,14 +208,15 @@ public class Aula {
     public boolean jaComecou() { return LocalDateTime.now().isAfter(dataHoraInicio); }
     public boolean estaCancelada() { return cancelada; }
 
+    public Integer getId() { return id; }
     public LocalDateTime getDataHoraInicio() { return dataHoraInicio; }
     public Duration getDuracao() { return duracao; }
     public int getCapacidadeMaxima() { return capacidadeMaxima; }
     public Estabelecimento getEstabelecimento() { return estabelecimento; }
     public Modalidade getModalidade() { return modalidade; }
     public Instrutor getInstrutor() { return instrutor; }
-    public synchronized List<Reserva> getReservas() {
-        return Collections.unmodifiableList(new ArrayList<>(reservas));
+    public List<Reserva> getReservas() {
+        return Collections.unmodifiableList(reservas);
     }
 
     @Override public String toString() {

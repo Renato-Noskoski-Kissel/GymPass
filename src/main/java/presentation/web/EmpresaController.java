@@ -3,9 +3,9 @@ package presentation.web;
 import application.plano.BeneficiariosService;
 import org.springframework.web.bind.annotation.*;
 
-/** HU2 - gestão do quadro de beneficiários. */
+/** HU2 - gestão do quadro de beneficiários. CNPJ e CPF vão na URL só com dígitos. */
 @RestController
-@RequestMapping("/api/empresas/{empresaId}")
+@RequestMapping("/api/empresas/{cnpjEmpresa}")
 public class EmpresaController {
 
     private final BeneficiariosService servico;
@@ -19,37 +19,37 @@ public class EmpresaController {
     public record NovoDependente(String nome, String cpf, String grauParentesco) {}
 
     @PostMapping("/funcionarios")
-    public void incluirFuncionario(@PathVariable int empresaId,
+    public void incluirFuncionario(@PathVariable String cnpjEmpresa,
                                    @RequestBody NovoFuncionario dados) {
-        servico.incluirFuncionario(empresaId, dados.nome(), dados.cpf(), dados.matricula(),
+        servico.incluirFuncionario(cnpjEmpresa, dados.nome(), dados.cpf(), dados.matricula(),
                 dados.planoId());
     }
 
-    @PostMapping("/funcionarios/{funcionarioId}/plano")
-    public void trocarPlano(@PathVariable int empresaId, @PathVariable int funcionarioId,
+    @PostMapping("/funcionarios/{cpf}/plano")
+    public void trocarPlano(@PathVariable String cnpjEmpresa, @PathVariable String cpf,
                             @RequestBody TrocaDePlano dados) {
-        servico.trocarPlano(empresaId, funcionarioId, dados.planoId());
+        servico.trocarPlano(cnpjEmpresa, cpf, dados.planoId());
     }
 
-    @PostMapping("/funcionarios/{funcionarioId}/suspender")
-    public void suspenderAdesao(@PathVariable int empresaId, @PathVariable int funcionarioId) {
-        servico.suspenderAdesao(empresaId, funcionarioId);
+    @PostMapping("/funcionarios/{cpf}/suspender")
+    public void suspenderBeneficio(@PathVariable String cnpjEmpresa, @PathVariable String cpf) {
+        servico.suspenderAdesao(cnpjEmpresa, cpf);
     }
 
-    @PostMapping("/funcionarios/{funcionarioId}/reativar")
-    public void reativarAdesao(@PathVariable int empresaId, @PathVariable int funcionarioId) {
-        servico.reativarAdesao(empresaId, funcionarioId);
+    @PostMapping("/funcionarios/{cpf}/reativar")
+    public void reativarBeneficio(@PathVariable String cnpjEmpresa, @PathVariable String cpf) {
+        servico.reativarAdesao(cnpjEmpresa, cpf);
     }
 
-    @PostMapping("/funcionarios/{funcionarioId}/dependentes")
-    public void incluirDependente(@PathVariable int empresaId, @PathVariable int funcionarioId,
+    @PostMapping("/funcionarios/{cpfFuncionario}/dependentes")
+    public void incluirDependente(@PathVariable String cnpjEmpresa, @PathVariable String cpfFuncionario,
                                   @RequestBody NovoDependente dados) {
-        servico.incluirDependente(empresaId, funcionarioId, dados.nome(), dados.cpf(),
+        servico.incluirDependente(cnpjEmpresa, cpfFuncionario, dados.nome(), dados.cpf(),
                 dados.grauParentesco());
     }
 
-    @DeleteMapping("/funcionarios/{funcionarioId}")
-    public void removerFuncionario(@PathVariable int empresaId, @PathVariable int funcionarioId) {
-        servico.removerFuncionario(empresaId, funcionarioId);
+    @DeleteMapping("/funcionarios/{cpf}")
+    public void removerFuncionario(@PathVariable String cnpjEmpresa, @PathVariable String cpf) {
+        servico.removerFuncionario(cnpjEmpresa, cpf);
     }
 }

@@ -1,0 +1,16 @@
+services:
+  db:                                  # nome do serviço (usado nos comandos)
+    image: postgres:16                 # imagem oficial do PostgreSQL, versão 16
+    container_name: gympass-db         # nome do container rodando
+    environment:
+      POSTGRES_DB: gympass             # cria um banco chamado gympass
+      POSTGRES_USER: gympass           # usuário dono do banco
+      POSTGRES_PASSWORD: gympass123    # senha desse usuário
+    ports:
+      - "5433:5432"                    # porta do SEU computador : porta DENTRO do container
+    volumes:
+      - ./banco:/docker-entrypoint-initdb.d       # scripts que rodam na 1ª inicialização
+      - gympass-dados:/var/lib/postgresql/data    # onde os dados ficam guardados
+
+volumes:
+  gympass-dados:                       # volume nomeado: sobrevive quando o container é desligado

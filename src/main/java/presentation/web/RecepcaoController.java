@@ -3,9 +3,9 @@ package presentation.web;
 import application.controleDeAcesso.CheckInService;
 import org.springframework.web.bind.annotation.*;
 
-/** UC07 - Validar Check-in na Recepção. O estabelecimento é o da recepção. */
+/** UC07 - Validar Check-in na Recepção. O estabelecimento (cnpj) é o da recepção. */
 @RestController
-@RequestMapping("/api/recepcao/{estabelecimentoId}")
+@RequestMapping("/api/recepcao/{cnpj}")
 public class RecepcaoController {
 
     private final CheckInService servico;
@@ -20,26 +20,24 @@ public class RecepcaoController {
 
     /** Passos 2 a 4 - localizar pelo código do comprovante. */
     @GetMapping("/checkins/{codigo}")
-    public Dtos.ConferenciaDto localizar(@PathVariable int estabelecimentoId,
-                                         @PathVariable String codigo) {
-        return montador.conferencia(servico.localizarNaRecepcao(estabelecimentoId, codigo));
+    public Dtos.ConferenciaDto localizar(@PathVariable String cnpj, @PathVariable String codigo) {
+        return montador.conferencia(servico.localizarNaRecepcao(cnpj, codigo));
     }
 
     /** Extensão 2a - localizar pelo CPF do aluno (só dígitos na URL). */
     @GetMapping("/cpf/{cpf}")
-    public Dtos.ConferenciaDto localizarPorCpf(@PathVariable int estabelecimentoId,
-                                               @PathVariable String cpf) {
-        return montador.conferencia(servico.localizarPorCpfNaRecepcao(estabelecimentoId, cpf));
+    public Dtos.ConferenciaDto localizarPorCpf(@PathVariable String cnpj, @PathVariable String cpf) {
+        return montador.conferencia(servico.localizarPorCpfNaRecepcao(cnpj, cpf));
     }
 
     @PostMapping("/checkins/{codigo}/validar")
-    public void validar(@PathVariable int estabelecimentoId, @PathVariable String codigo) {
-        servico.validarCheckIn(estabelecimentoId, codigo);
+    public void validar(@PathVariable String cnpj, @PathVariable String codigo) {
+        servico.validarCheckIn(cnpj, codigo);
     }
 
     @PostMapping("/checkins/{codigo}/recusar")
-    public void recusar(@PathVariable int estabelecimentoId, @PathVariable String codigo,
+    public void recusar(@PathVariable String cnpj, @PathVariable String codigo,
                         @RequestBody Recusa dados) {
-        servico.recusarCheckIn(estabelecimentoId, codigo, dados.motivo());
+        servico.recusarCheckIn(cnpj, codigo, dados.motivo());
     }
 }

@@ -14,12 +14,10 @@ public class CheckInController {
         this.servico = servico;
     }
 
-    public record NovoCheckIn(int alunoId, int estabelecimentoId,
-                              double latitude, double longitude) {}
+    public record NovoCheckIn(String cpf, String cnpj, double latitude, double longitude) {}
 
     @PostMapping
     public void realizarCheckIn(@RequestBody NovoCheckIn dados) {
-        servico.realizarCheckIn(dados.alunoId(), dados.estabelecimentoId(),
-                dados.latitude(), dados.longitude());
+        servico.realizarCheckIn(dados.cpf(), dados.cnpj(), dados.latitude(), dados.longitude());
     }
 }

@@ -9,6 +9,7 @@ import dominio.cadastroRede.Dependente;
 import dominio.cadastroRede.Empresa;
 import dominio.cadastroRede.Estabelecimento;
 import dominio.cadastroRede.Funcionario;
+import jakarta.persistence.*;
 import java.time.LocalDate;
 
 /**
@@ -29,13 +30,41 @@ import java.time.LocalDate;
  * (Ativa, Suspensa, Encerrada). As validações moram nos estados; esta
  * classe só delega ao estado corrente.
  */
+@Entity
+@Table(name = "adesoes")
 public class Adesao {
 
-    private final Aluno aluno;
-    private final Plano plano;
-    private final LocalDate dataInicio;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Integer id;
+
+    /** EAGER: Aluno é abstrata; Ativa faz instanceof Funcionario. */
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "aluno_cpf", nullable = false)
+    private Aluno aluno;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "plano_id", nullable = false)
+    private Plano plano;
+
+    @Column(name = "data_inicio", nullable = false)
+    private LocalDate dataInicio;
+
+    /** Nulo enquanto a adesão não for encerrada. */
+    @Column(name = "data_fim")
     private LocalDate dataFim;
+
+    /**
+     * Estado do padrão State. Gravado como texto na coluna situacao pelo
+     * persistencia.ConversorEstadoAdesao (autoApply), que reconstrói
+     * Ativa/Suspensa/Encerrada ao ler.
+     */
+    @Column(name = "situacao", nullable = false, length = 20)
     private EstadoAdesao estado;
+
+    /** Exigido pela JPA. */
+    protected Adesao() { }
 
     /** Visível no pacote para que Ativa crie a adesão do dependente (RN3). */
     Adesao(Aluno aluno, Plano plano) {
@@ -103,6 +132,7 @@ public class Adesao {
 
     void registrarFim(LocalDate data) { this.dataFim = data; }
 
+    public Integer getId() { return id; }
     public Aluno getAluno() { return aluno; }
     public Plano getPlano() { return plano; }
     public LocalDate getDataInicio() { return dataInicio; }

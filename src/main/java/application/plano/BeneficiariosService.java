@@ -8,11 +8,14 @@ import dominio.cadastroRede.Funcionario;
 import dominio.planosAdesao.Adesao;
 import dominio.planosAdesao.Plano;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import persistencia.Repositorio;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+
+import static application.NaoEncontradoException.exigir;
 
 /** HU2 - camada de aplicação para a gestão do quadro de beneficiários. */
 @Service
@@ -24,24 +27,43 @@ public class BeneficiariosService {
         this.repositorio = repositorio;
     }
 
-    private Empresa empresa(int id) { return repositorio.getEmpresas().get(id); }
+    private Empresa empresa(String cnpj) {
+        return exigir(repositorio.buscarEmpresa(cnpj), "Empresa não encontrada: " + cnpj);
+    }
+
+    private Plano plano(int id) {
+        return exigir(repositorio.buscarPlano(id), "Plano não encontrado: " + id);
+    }
+
+    /** Funcionário do quadro desta empresa; um CPF de outra empresa não serve. */
+    private Funcionario funcionario(String cnpjEmpresa, String cpf) {
+        Empresa empresa = empresa(cnpjEmpresa);
+        return exigir(empresa.getFuncionarios().stream()
+                .filter(f -> f.temCpf(cpf)).findFirst().orElse(null),
+                "Funcionário " + cpf + " não está no quadro de " + empresa + ".");
+    }
 
     private String emailDe(String nome) {
         return nome.toLowerCase().replaceAll("\\s+", ".") + "@empresa.com";
     }
 
-    /** Inclusão no quadro e concessão do plano acontecem na mesma operação. */
-    public void incluirFuncionario(int empresaId, String nome, String cpf,
+    /**
+     * Inclusão no quadro e concessão do plano acontecem na mesma operação.
+     * O aluno é gravado antes da adesão, que referencia a linha dele (adesoes.aluno_cpf).
+     */
+    @Transactional
+    public void incluirFuncionario(String cnpjEmpresa, String nome, String cpf,
                                    String matricula, int planoId) {
-        Empresa empresa = empresa(empresaId);
-        Plano plano = repositorio.getPlanos().get(planoId);
+        Empresa empresa = empresa(cnpjEmpresa);
+        Plano plano = plano(planoId);
         exigirCpfLivre(cpf);
 
         Funcionario funcionario = new Funcionario(nome, cpf, emailDe(nome),
                 matricula, LocalDate.now(), empresa);
+        Adesao adesao = Adesao.cadastrarBeneficiario(funcionario, plano);
 
-        repositorio.getAdesoes().add(Adesao.cadastrarBeneficiario(funcionario, plano));
-        repositorio.getAlunos().add(funcionario);
+        repositorio.adicionarAluno(funcionario);
+        repositorio.adicionarAdesao(adesao);
     }
 
     /**
@@ -50,78 +72,82 @@ public class BeneficiariosService {
      * O funcionário é trocado primeiro: se o domínio recusar (plano não
      * oferecido, suspensão RN7, plano sem dependentes RN3), nada muda.
      *
-     * Atenção: esta cascata (e a de suspender/reativar) não é atômica. Com a
-     * persistência em memória não há transação; se um dependente falhar no
-     * meio, os que vieram antes já terão sido alterados.
+     * A cascata é atômica: se um dependente falhar no meio, a transação
+     * desfaz também as trocas que já tinham sido feitas.
      */
-    public void trocarPlano(int empresaId, int funcionarioId, int planoId) {
-        Adesao atual = adesaoVigente(empresaId, funcionarioId);
-        Plano novo = repositorio.getPlanos().get(planoId);
-        List<Adesao> dosDependentes = adesoesVigentesDosDependentes(empresaId, funcionarioId);
+    @Transactional
+    public void trocarPlano(String cnpjEmpresa, String cpf, int planoId) {
+        Adesao atual = adesaoVigente(cnpjEmpresa, cpf);
+        Plano novo = plano(planoId);
+        List<Adesao> dosDependentes = adesoesVigentesDosDependentes(cnpjEmpresa, cpf);
 
-        repositorio.getAdesoes().add(Adesao.trocarPlano(atual, novo));
+        repositorio.adicionarAdesao(Adesao.trocarPlano(atual, novo));
         for (Adesao adesaoDependente : dosDependentes) {
-            repositorio.getAdesoes().add(Adesao.trocarPlano(adesaoDependente, novo));
+            repositorio.adicionarAdesao(Adesao.trocarPlano(adesaoDependente, novo));
         }
     }
 
     /**
      * RN7 - a empresa contratante está inadimplente: o bloqueio atinge o
      * funcionário e os dependentes dele. Coordenar as várias adesões é papel
-     * da aplicação; cada Adesao só sabe da própria transição.
-     * Não atômica enquanto a persistência for em memória (ver trocarPlano).
+     * da aplicação; cada Adesao só sabe da própria transição. Atômica (ver trocarPlano).
      */
-    public void suspenderAdesao(int empresaId, int funcionarioId) {
-        adesaoVigente(empresaId, funcionarioId).suspender();
-        adesoesVigentesDosDependentes(empresaId, funcionarioId).forEach(Adesao::suspender);
+    @Transactional
+    public void suspenderAdesao(String cnpjEmpresa, String cpf) {
+        adesaoVigente(cnpjEmpresa, cpf).suspender();
+        adesoesVigentesDosDependentes(cnpjEmpresa, cpf).forEach(Adesao::suspender);
     }
 
     /** RN7 - a empresa regularizou o pagamento: o funcionário e os dependentes voltam a ter acesso. */
-    public void reativarAdesao(int empresaId, int funcionarioId) {
-        adesaoVigente(empresaId, funcionarioId).reativar();
-        adesoesVigentesDosDependentes(empresaId, funcionarioId).forEach(Adesao::reativar);
+    @Transactional
+    public void reativarAdesao(String cnpjEmpresa, String cpf) {
+        adesaoVigente(cnpjEmpresa, cpf).reativar();
+        adesoesVigentesDosDependentes(cnpjEmpresa, cpf).forEach(Adesao::reativar);
     }
 
-    private List<Adesao> adesoesVigentesDosDependentes(int empresaId, int funcionarioId) {
-        Funcionario f = empresa(empresaId).getFuncionarios().get(funcionarioId);
-        return f.getDependentes().stream()
+    private List<Adesao> adesoesVigentesDosDependentes(String cnpjEmpresa, String cpf) {
+        return funcionario(cnpjEmpresa, cpf).getDependentes().stream()
                 .map(repositorio::adesaoDe)
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    public void incluirDependente(int empresaId, int funcionarioId,
+    /** O dependente é gravado antes da adesão dele, que referencia a linha (adesoes.aluno_cpf). */
+    @Transactional
+    public void incluirDependente(String cnpjEmpresa, String cpfFuncionario,
                                   String nome, String cpf, String grauParentesco) {
-        Adesao adesao = adesaoVigente(empresaId, funcionarioId);
-        Funcionario responsavel = empresa(empresaId).getFuncionarios().get(funcionarioId);
+        Adesao adesao = adesaoVigente(cnpjEmpresa, cpfFuncionario);
+        Funcionario responsavel = funcionario(cnpjEmpresa, cpfFuncionario);
         exigirCpfLivre(cpf);
 
         Dependente dependente = new Dependente(nome, cpf, emailDe(nome),
                 grauParentesco, responsavel);
+        Adesao adesaoDoDependente = adesao.incluirDependente(dependente);
 
-        repositorio.getAdesoes().add(adesao.incluirDependente(dependente));
-        repositorio.getAlunos().add(dependente);
+        repositorio.adicionarAluno(dependente);
+        repositorio.adicionarAdesao(adesaoDoDependente);
     }
 
-    public void removerFuncionario(int empresaId, int funcionarioId) {
-        Empresa empresa = empresa(empresaId);
-        empresa.removerFuncionario(empresa.getFuncionarios().get(funcionarioId));
+    @Transactional
+    public void removerFuncionario(String cnpjEmpresa, String cpf) {
+        Funcionario funcionario = funcionario(cnpjEmpresa, cpf);
+        funcionario.getEmpresaVinculada().removerFuncionario(funcionario);
     }
 
     /**
      * O CPF identifica o aluno na recepção (UC07, 2a), então não pode repetir.
-     * Fica aqui porque só a lista de todos os alunos sabe se ele já existe.
+     * Fica aqui porque só o repositório sabe se ele já existe.
      */
     private void exigirCpfLivre(String cpf) {
-        Aluno existente = repositorio.alunoPorCpf(cpf);
+        Aluno existente = repositorio.buscarAluno(cpf);
         if (existente != null) {
             throw new RegraDeNegocioException(
                     "O CPF " + cpf + " já está cadastrado para " + existente + ".");
         }
     }
 
-    private Adesao adesaoVigente(int empresaId, int funcionarioId) {
-        Funcionario f = empresa(empresaId).getFuncionarios().get(funcionarioId);
+    private Adesao adesaoVigente(String cnpjEmpresa, String cpf) {
+        Funcionario f = funcionario(cnpjEmpresa, cpf);
         Adesao adesao = repositorio.adesaoDe(f);
         if (adesao == null) {
             throw new RegraDeNegocioException("Funcionário sem adesão vigente: " + f);

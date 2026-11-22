@@ -8,14 +8,17 @@ import java.util.List;
  * As classes de domínio NÃO são enviadas ao navegador. Funcionario aponta para
  * Empresa, que tem lista de Funcionario — serializar isso direto entraria em
  * recursão infinita. Estes records são cópias planas, só com o que a tela usa.
+ *
+ * Cada registro é identificado pela chave do banco: cnpj, cpf, registro ou id.
+ * CNPJ e CPF vão só com dígitos; a pontuação é posta pelo app.js, na tela.
  */
 public class Dtos {
 
     public record ModalidadeDto(int id, String nome, String descricao) {}
 
-    public record InstrutorDto(int id, String nome, String registro, String especialidade) {}
+    public record InstrutorDto(String registro, String nome, String especialidade) {}
 
-    public record EstabelecimentoDto(int id, String nome, String tipo, double valorPorCheckIn,
+    public record EstabelecimentoDto(String cnpj, String nome, String tipo, double valorPorCheckIn,
                                      int nivelMinimo, String situacao, String endereco,
                                      double latitude, double longitude,
                                      List<ModalidadeDto> modalidades,
@@ -24,12 +27,12 @@ public class Dtos {
     public record DependenteDto(String nome, String cpf, String grauParentesco, boolean elegivel,
                                 String situacaoAdesao) {}
 
-    public record FuncionarioDto(int id, String nome, String cpf, String matricula, String plano,
+    public record FuncionarioDto(String cpf, String nome, String matricula, String plano,
                                  boolean elegivel, boolean planoPermiteDependentes,
                                  String situacaoAdesao, boolean podeSuspender,
                                  boolean podeReativar, List<DependenteDto> dependentes) {}
 
-    public record EmpresaDto(int id, String razaoSocial, int limiteDependentes,
+    public record EmpresaDto(String cnpj, String razaoSocial, int limiteDependentes,
                              int totalFuncionarios, int totalDependentes,
                              int totalBeneficiarios, List<FuncionarioDto> funcionarios) {}
 
@@ -40,19 +43,19 @@ public class Dtos {
     public record AulaDto(int id, String inicio, String inicioLegivel, long duracaoMin,
                           int capacidade, int vagasDisponiveis, String modalidade,
                           String instrutor, boolean cancelada, boolean jaComecou,
-                          int estabelecimentoId, String estabelecimento) {}
+                          String estabelecimentoCnpj, String estabelecimento) {}
 
-    public record AlunoDto(int id, String nome, String tipo, String empresa, String plano,
+    public record AlunoDto(String cpf, String nome, String tipo, String empresa, String plano,
                            int limiteAulasMes, int reservasNoMes, boolean elegivel) {}
 
-    public record CheckInDto(int id, int alunoId, String aluno, int estabelecimentoId,
+    public record CheckInDto(int id, String alunoCpf, String aluno, String estabelecimentoCnpj,
                              String estabelecimento, String quando, boolean hoje,
                              String codigo, String situacao, String motivoRecusa) {}
 
     /** UC07 passo 4 - só o que a recepção pode ver (RNF3). */
     public record ConferenciaDto(String codigo, String aluno, String quando, String situacao) {}
 
-    public record ReservaDto(int id, int alunoId, int aulaId, String aula,
+    public record ReservaDto(int id, String alunoCpf, int aulaId, String aula,
                              String inicio, String quando, long duracaoMin,
                              String instrutor, String endereco, String feitaEm,
                              String situacao, boolean penalizada,

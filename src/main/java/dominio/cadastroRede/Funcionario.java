@@ -1,18 +1,35 @@
 package dominio.cadastroRede;
 
 import dominio.RegraDeNegocioException;
+import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+@Entity
+@Table(name = "funcionarios")
+@PrimaryKeyJoinColumn(name = "cpf")
+@DiscriminatorValue("FUNCIONARIO")
 public class Funcionario extends Aluno {
 
-    private final String matricula;
-    private final LocalDate dataAdmissao;
+    @Column(name = "matricula", nullable = false, length = 30)
+    private String matricula;
+
+    @Column(name = "data_admissao")
+    private LocalDate dataAdmissao;
+
+    /** Aceita nulo: desvincular() tira a empresa. */
+    @ManyToOne
+    @JoinColumn(name = "empresa_cnpj")
     private Empresa empresa;
 
-    private final List<Dependente> dependentes = new ArrayList<>();
+    /** Lado inverso: quem grava é Dependente.responsavel (coluna dependentes.responsavel_cpf). */
+    @OneToMany(mappedBy = "responsavel")
+    private List<Dependente> dependentes = new ArrayList<>();
+
+    /** Exigido pela JPA. */
+    protected Funcionario() { }
 
     public Funcionario(String nome, String cpf, String email,
                        String matricula, LocalDate dataAdmissao, Empresa empresa) {

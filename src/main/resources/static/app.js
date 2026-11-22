@@ -8,6 +8,11 @@
    Fluxo de cada ação: envia POST/DELETE -> recarrega GET /api/estado ->
    redesenha a vista atual. Erros de regra de negócio voltam como HTTP 400 com
    a mensagem original definida no domínio.
+
+   Cada registro é identificado pela chave do banco: cnpj (estabelecimento e
+   empresa), cpf (aluno), registro (instrutor) ou id (plano, modalidade, aula,
+   reserva, check-in). CNPJ e CPF chegam e vão só com dígitos; a pontuação é
+   posta aqui, apenas para exibir.
    ========================================================================== */
 
 const $ = sel => document.querySelector(sel);
@@ -20,13 +25,13 @@ let estado = {
 
 let vistaAtual = 'admin';
 let abaAtual = 'cadastro';   // aba dentro do perfil Estabelecimento: cadastro, grade ou recepcao
-let empresaId = 0;
-let estabelecimentoId = 0;
+let empresaCnpj = null;
+let estabelecimentoCnpj = null;
 
 /* seleções que precisam sobreviver ao redesenho da tela */
-let alunoId = 0;
-let checkinEstabelecimentoId = null;
-let coordenadasDe = null;   // estabelecimento cujas coordenadas estão nos campos do check-in
+let alunoCpf = null;
+let checkinEstabelecimentoCnpj = null;
+let coordenadasDe = null;   // cnpj do estabelecimento cujas coordenadas estão nos campos do check-in
 let conferencia = null;     // UC07: check-in localizado pela recepção (código, aluno, quando)
 
 /* ---------- comunicação com o servidor ---------- */
@@ -96,9 +101,28 @@ function moeda(v) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function preencherSelect(el, itens, rotulo, idSelecionado) {
+/** CPF e CNPJ trafegam só com dígitos; estes dois põem a pontuação para exibir. */
+function formatarCpf(cpf) {
+  return cpf ? cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4') : '';
+}
+
+function formatarCnpj(cnpj) {
+  return cnpj ? cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : '';
+}
+
+const soDigitos = texto => texto.replace(/\D/g, '');
+
+/**
+ * chave: que campo do item vai no value da opção (cnpj, cpf, registro ou id).
+ * O value de um <option> é sempre texto, então a comparação é feita como texto.
+ */
+function preencherSelect(el, itens, rotulo, selecionado, chave = it => it.id) {
   el.innerHTML = itens
-    .map(it => `<option value="${it.id}"${it.id === idSelecionado ? ' selected' : ''}>${rotulo(it)}</option>`)
+    .map(it => {
+      const valor = String(chave(it));
+      const marcado = selecionado != null && valor === String(selecionado);
+      return `<option value="${valor}"${marcado ? ' selected' : ''}>${rotulo(it)}</option>`;
+    })
     .join('');
 }
 
@@ -110,9 +134,9 @@ function barraDeVagas(aula) {
     (_, i) => `<i${i < ocupadas ? ' class="ocupada"' : ''}></i>`).join('');
 }
 
-const empresaAtual = () => estado.empresas.find(e => e.id === empresaId) || estado.empresas[0];
+const empresaAtual = () => estado.empresas.find(e => e.cnpj === empresaCnpj) || estado.empresas[0];
 const estabelecimentoAtual = () =>
-  estado.estabelecimentos.find(e => e.id === estabelecimentoId) || estado.estabelecimentos[0];
+  estado.estabelecimentos.find(e => e.cnpj === estabelecimentoCnpj) || estado.estabelecimentos[0];
 
 /* ---------- HU4: administração ---------- */
 
@@ -128,12 +152,12 @@ function renderAdmin() {
         const classe = aprovado ? 'aprovado' : suspenso ? 'suspenso' : 'pendente';
         const rotulo = aprovado ? 'Ativo' : suspenso ? 'Suspenso' : 'Aguardando';
         const botao = aprovado
-          ? `<button class="acao discreta risco" data-suspender="${e.id}">Suspender</button>`
-          : `<button class="acao discreta" data-aprovar="${e.id}">Aprovar</button>`;
+          ? `<button class="acao discreta risco" data-suspender="${e.cnpj}">Suspender</button>`
+          : `<button class="acao discreta" data-aprovar="${e.cnpj}">Aprovar</button>`;
         return `<div class="item">
           <div class="item-corpo">
             <div class="item-nome">${e.nome}</div>
-            <div class="item-detalhe">${e.tipo} · nível ${e.nivelMinimo} · ${moeda(e.valorPorCheckIn)} por check-in</div>
+            <div class="item-detalhe">CNPJ ${formatarCnpj(e.cnpj)} · ${e.tipo} · nível ${e.nivelMinimo} · ${moeda(e.valorPorCheckIn)} por check-in</div>
             <div class="item-detalhe">${e.endereco}</div>
           </div>
           ${selo(rotulo, classe)}
@@ -147,7 +171,7 @@ function renderAdmin() {
     ? estado.empresas.map(e => `<div class="item">
         <div class="item-corpo">
           <div class="item-nome">${e.razaoSocial}</div>
-          <div class="item-detalhe">${e.totalBeneficiarios} beneficiários · até ${e.limiteDependentes} dependentes por funcionário</div>
+          <div class="item-detalhe">CNPJ ${formatarCnpj(e.cnpj)} · ${e.totalBeneficiarios} beneficiários · até ${e.limiteDependentes} dependentes por funcionário</div>
         </div>
       </div>`).join('')
     : '<p class="vazio">Nenhuma empresa contratada ainda.</p>';
@@ -171,7 +195,7 @@ function renderAdmin() {
 /* ---------- HU2: empresa ---------- */
 
 function renderEmpresa() {
-  preencherSelect($('#empresa-atual'), estado.empresas, e => e.razaoSocial, empresaId);
+  preencherSelect($('#empresa-atual'), estado.empresas, e => e.razaoSocial, empresaCnpj, e => e.cnpj);
   const empresa = empresaAtual();
   if (!empresa) return;
 
@@ -196,22 +220,22 @@ function renderEmpresa() {
   $('#lista-funcionarios').innerHTML = empresa.funcionarios.length
     ? empresa.funcionarios.map(f => {
         const deps = f.dependentes.map(d =>
-          `<div class="item-detalhe">${d.nome} · ${d.grauParentesco} · CPF ${d.cpf} ${seloBeneficiario(d)}</div>`
+          `<div class="item-detalhe">${d.nome} · ${d.grauParentesco} · CPF ${formatarCpf(d.cpf)} ${seloBeneficiario(d)}</div>`
         ).join('');
         const podeDep = f.planoPermiteDependentes
           && f.dependentes.length < empresa.limiteDependentes;
         return `<div class="item">
           <div class="item-corpo">
             <div class="item-nome">${f.nome}</div>
-            <div class="item-detalhe">${f.matricula} · CPF ${f.cpf} · plano ${f.plano || 'nenhum'}</div>
+            <div class="item-detalhe">${f.matricula} · CPF ${formatarCpf(f.cpf)} · plano ${f.plano || 'nenhum'}</div>
             ${deps}
           </div>
           ${seloBeneficiario(f)}
-          <button class="acao discreta" data-trocar="${f.id}">Trocar plano</button>
-          ${f.podeSuspender ? `<button class="acao discreta" data-suspender="${f.id}">Suspender benefício</button>` : ''}
-          ${f.podeReativar ? `<button class="acao discreta" data-reativar="${f.id}">Reativar benefício</button>` : ''}
-          ${podeDep ? `<button class="acao discreta" data-dependente="${f.id}">Incluir dependente</button>` : ''}
-          <button class="acao discreta risco" data-remover="${f.id}">Remover</button>
+          <button class="acao discreta" data-trocar="${f.cpf}">Trocar plano</button>
+          ${f.podeSuspender ? `<button class="acao discreta" data-suspender="${f.cpf}">Suspender benefício</button>` : ''}
+          ${f.podeReativar ? `<button class="acao discreta" data-reativar="${f.cpf}">Reativar benefício</button>` : ''}
+          ${podeDep ? `<button class="acao discreta" data-dependente="${f.cpf}">Incluir dependente</button>` : ''}
+          <button class="acao discreta risco" data-remover="${f.cpf}">Remover</button>
         </div>`;
       }).join('')
     : '<p class="vazio">Ninguém no quadro ainda. Inclua o primeiro funcionário abaixo.</p>';
@@ -221,7 +245,7 @@ function renderEmpresa() {
 
 function renderEstabelecimento() {
   preencherSelect($('#estabelecimento-atual'), estado.estabelecimentos,
-    e => e.nome, estabelecimentoId);
+    e => e.nome, estabelecimentoCnpj, e => e.cnpj);
   const est = estabelecimentoAtual();
 
   document.querySelectorAll('.aba').forEach(b =>
@@ -254,7 +278,7 @@ function renderCadastro(est) {
           <div class="item-nome">${i.nome}</div>
           <div class="item-detalhe">${i.registro} · ${i.especialidade || 'geral'}</div>
         </div>
-        <button class="acao discreta risco" data-desligar="${i.id}">Desligar</button>
+        <button class="acao discreta risco" data-desligar="${i.registro}">Desligar</button>
       </div>`).join('')
     : '<p class="vazio">Nenhum instrutor. Sem instrutor não é possível criar aulas.</p>';
 }
@@ -263,9 +287,9 @@ function renderCadastro(est) {
 
 function renderGrade(est) {
   preencherSelect($('#aula-modalidade'), est.modalidades, m => m.nome);
-  preencherSelect($('#aula-instrutor'), est.instrutores, i => i.nome);
+  preencherSelect($('#aula-instrutor'), est.instrutores, i => i.nome, null, i => i.registro);
 
-  const aulas = estado.aulas.filter(a => a.estabelecimentoId === est.id);
+  const aulas = estado.aulas.filter(a => a.estabelecimentoCnpj === est.cnpj);
 
   $('#lista-aulas').innerHTML = aulas.length
     ? aulas.map(aula => {
@@ -288,10 +312,10 @@ function renderGrade(est) {
 
 /* ---------- UC03 e UC04a: aluno ---------- */
 
-const alunoAtual = () => estado.alunos.find(a => a.id === alunoId) || estado.alunos[0];
+const alunoAtual = () => estado.alunos.find(a => a.cpf === alunoCpf) || estado.alunos[0];
 const credenciados = () => estado.estabelecimentos.filter(e => e.situacao === 'APROVADO');
 const estabelecimentoDoCheckin = () =>
-  credenciados().find(e => e.id === checkinEstabelecimentoId) || credenciados()[0];
+  credenciados().find(e => e.cnpj === checkinEstabelecimentoCnpj) || credenciados()[0];
 
 function preencherCoordenadas(lat, lng) {
   $('#checkin-lat').value = lat.toFixed(6);
@@ -301,7 +325,7 @@ function preencherCoordenadas(lat, lng) {
 function renderAluno() {
   preencherSelect($('#aluno-atual'), estado.alunos, a =>
     `${a.nome}${a.tipo === 'Dependente' ? ' (dependente)' : ''} — ${a.plano || 'sem plano'}`,
-    alunoId);
+    alunoCpf, a => a.cpf);
   const aluno = alunoAtual();
   if (!aluno) return;
 
@@ -320,7 +344,7 @@ function renderAluno() {
     </div>`;
 
   /* check-in */
-  const meusCheckIns = estado.checkIns.filter(c => c.alunoId === aluno.id);
+  const meusCheckIns = estado.checkIns.filter(c => c.alunoCpf === aluno.cpf);
   $('#cont-checkins').textContent = `${meusCheckIns.length} registrados`;
   const deHoje = meusCheckIns.filter(c => c.hoje).pop();
   const situacaoComprovante = {
@@ -343,15 +367,15 @@ function renderAluno() {
 
   const lista = credenciados();
   const est = estabelecimentoDoCheckin();
-  preencherSelect($('#checkin-estabelecimento'), lista, e => e.nome, est ? est.id : null);
-  if (est && coordenadasDe !== est.id) {
+  preencherSelect($('#checkin-estabelecimento'), lista, e => e.nome, est ? est.cnpj : null, e => e.cnpj);
+  if (est && coordenadasDe !== est.cnpj) {
     preencherCoordenadas(est.latitude, est.longitude);
-    coordenadasDe = est.id;
+    coordenadasDe = est.cnpj;
   }
 
   /* reservas */
   /* UC04b passo 1: confirmadas ainda não iniciadas, por data e hora */
-  const minhas = estado.reservas.filter(r => r.alunoId === aluno.id);
+  const minhas = estado.reservas.filter(r => r.alunoCpf === aluno.cpf);
   const cancelavel = r => r.situacao === 'CONFIRMADA' && (r.aulaCancelada || !r.aulaJaComecou);
   const ativas = minhas.filter(cancelavel).sort((a, b) => a.inicio.localeCompare(b.inicio));
   const historico = minhas.filter(r => !cancelavel(r)).sort((a, b) => b.inicio.localeCompare(a.inicio));
@@ -445,7 +469,7 @@ function renderRecepcao(est) {
     $('#recepcao-resultado').innerHTML = '';
   }
 
-  const deHoje = estado.checkIns.filter(c => c.estabelecimentoId === est.id && c.hoje);
+  const deHoje = estado.checkIns.filter(c => c.estabelecimentoCnpj === est.cnpj && c.hoje);
   const pendentes = deHoje.filter(c => c.situacao === 'PENDENTE').length;
   $('#cont-recepcao').textContent = `${pendentes} aguardando`;
   $('#lista-recepcao').innerHTML = deHoje.length
@@ -495,6 +519,7 @@ $('#form-estabelecimento').addEventListener('submit', ev => {
   ev.preventDefault();
   const nome = $('#est-nome').value.trim();
   executar(() => api('/estabelecimentos', 'POST', {
+    cnpj: soDigitos($('#est-cnpj').value),
     nome,
     tipo: $('#est-tipo').value,
     valorPorCheckIn: parseFloat($('#est-valor').value),
@@ -514,6 +539,7 @@ $('#form-empresa').addEventListener('submit', ev => {
   ev.preventDefault();
   const razaoSocial = $('#emp-nome').value.trim();
   executar(() => api('/empresas', 'POST', {
+    cnpj: soDigitos($('#emp-cnpj').value),
     razaoSocial,
     limiteDependentes: parseInt($('#emp-dep').value),
     diaVencimento: parseInt($('#emp-venc').value)
@@ -547,7 +573,7 @@ $('#vista-admin').addEventListener('click', ev => {
 /* --- HU2 --- */
 
 $('#empresa-atual').addEventListener('change', ev => {
-  empresaId = parseInt(ev.target.value);
+  empresaCnpj = ev.target.value;
   render();
 });
 
@@ -559,9 +585,9 @@ $('#form-funcionario').addEventListener('submit', ev => {
     avisar('Crie um plano antes de incluir funcionários.', 'erro');
     return;
   }
-  executar(() => api(`/empresas/${empresaId}/funcionarios`, 'POST', {
+  executar(() => api(`/empresas/${empresaAtual().cnpj}/funcionarios`, 'POST', {
     nome,
-    cpf: $('#func-cpf').value.trim(),
+    cpf: soDigitos($('#func-cpf').value),
     matricula: $('#func-matricula').value.trim(),
     planoId
   }).then(() => ev.target.reset()),
@@ -571,26 +597,27 @@ $('#form-funcionario').addEventListener('submit', ev => {
 $('#vista-empresa').addEventListener('click', ev => {
   const { trocar, remover, dependente, suspender, reativar } = ev.target.dataset;
   const empresa = empresaAtual();
+  const base = `/empresas/${empresa.cnpj}/funcionarios`;
 
   if (trocar !== undefined) {
     const nomes = estado.planos.map((p, i) => `${i + 1}. ${p.nome}`).join('\n');
     const escolha = prompt(`Novo plano:\n${nomes}`, '1');
     const plano = estado.planos[parseInt(escolha) - 1];
     if (!plano) return;
-    executar(() => api(`/empresas/${empresaId}/funcionarios/${trocar}/plano`, 'POST',
+    executar(() => api(`${base}/${trocar}/plano`, 'POST',
       { planoId: plano.id }), `Plano alterado para ${plano.nome}.`);
   }
 
   if (suspender !== undefined) {
-    const f = empresa.funcionarios.find(x => x.id === parseInt(suspender));
+    const f = empresa.funcionarios.find(x => x.cpf === suspender);
     if (!confirm(`Suspender o benefício de ${f.nome} e dos dependentes por inadimplência (RN7)?`)) return;
-    executar(() => api(`/empresas/${empresaId}/funcionarios/${suspender}/suspender`, 'POST'),
+    executar(() => api(`${base}/${suspender}/suspender`, 'POST'),
       `Benefício de ${f.nome} suspenso.`);
   }
 
   if (reativar !== undefined) {
-    const f = empresa.funcionarios.find(x => x.id === parseInt(reativar));
-    executar(() => api(`/empresas/${empresaId}/funcionarios/${reativar}/reativar`, 'POST'),
+    const f = empresa.funcionarios.find(x => x.cpf === reativar);
+    executar(() => api(`${base}/${reativar}/reativar`, 'POST'),
       `Benefício de ${f.nome} reativado.`);
   }
 
@@ -600,14 +627,14 @@ $('#vista-empresa').addEventListener('click', ev => {
     const cpf = prompt('CPF do dependente:');
     if (!cpf) return;
     const grau = prompt('Grau de parentesco:', 'Filho') || 'Dependente';
-    executar(() => api(`/empresas/${empresaId}/funcionarios/${dependente}/dependentes`, 'POST',
-      { nome, cpf, grauParentesco: grau }), `${nome} incluído como dependente.`);
+    executar(() => api(`${base}/${dependente}/dependentes`, 'POST',
+      { nome, cpf: soDigitos(cpf), grauParentesco: grau }), `${nome} incluído como dependente.`);
   }
 
   if (remover !== undefined) {
-    const f = empresa.funcionarios.find(x => x.id === parseInt(remover));
+    const f = empresa.funcionarios.find(x => x.cpf === remover);
     if (!confirm(`Remover ${f.nome} do quadro? Os dependentes dele perdem o acesso junto.`)) return;
-    executar(() => api(`/empresas/${empresaId}/funcionarios/${remover}`, 'DELETE'),
+    executar(() => api(`${base}/${remover}`, 'DELETE'),
       `${f.nome} removido. O acesso dele e dos dependentes foi encerrado.`);
   }
 });
@@ -615,7 +642,7 @@ $('#vista-empresa').addEventListener('click', ev => {
 /* --- Estabelecimento: seletor e abas --- */
 
 $('#estabelecimento-atual').addEventListener('change', ev => {
-  estabelecimentoId = parseInt(ev.target.value);
+  estabelecimentoCnpj = ev.target.value;
   conferencia = null;
   render();
 });
@@ -632,7 +659,7 @@ document.querySelectorAll('.aba').forEach(botao => {
 $('#form-modalidade').addEventListener('submit', ev => {
   ev.preventDefault();
   const nome = $('#mod-nome').value.trim();
-  executar(() => api(`/estabelecimentos/${estabelecimentoId}/modalidades`, 'POST', {
+  executar(() => api(`/estabelecimentos/${estabelecimentoAtual().cnpj}/modalidades`, 'POST', {
     nome, descricao: $('#mod-desc').value.trim()
   }).then(() => ev.target.reset()), `${nome} adicionada.`);
 });
@@ -640,7 +667,7 @@ $('#form-modalidade').addEventListener('submit', ev => {
 $('#form-instrutor').addEventListener('submit', ev => {
   ev.preventDefault();
   const nome = $('#ins-nome').value.trim();
-  executar(() => api(`/estabelecimentos/${estabelecimentoId}/instrutores`, 'POST', {
+  executar(() => api(`/estabelecimentos/${estabelecimentoAtual().cnpj}/instrutores`, 'POST', {
     nome,
     registro: $('#ins-registro').value.trim(),
     especialidade: $('#ins-esp').value.trim()
@@ -649,14 +676,13 @@ $('#form-instrutor').addEventListener('submit', ev => {
 
 $('#vista-estabelecimento').addEventListener('click', ev => {
   const { removerModalidade, desligar } = ev.target.dataset;
+  const base = `/estabelecimentos/${estabelecimentoAtual().cnpj}`;
   if (removerModalidade !== undefined) {
-    executar(() => api(
-      `/estabelecimentos/${estabelecimentoId}/modalidades/${removerModalidade}`, 'DELETE'),
+    executar(() => api(`${base}/modalidades/${removerModalidade}`, 'DELETE'),
       'Modalidade removida.');
   }
   if (desligar !== undefined) {
-    executar(() => api(
-      `/estabelecimentos/${estabelecimentoId}/instrutores/${desligar}`, 'DELETE'),
+    executar(() => api(`${base}/instrutores/${encodeURIComponent(desligar)}`, 'DELETE'),
       'Instrutor desligado.');
   }
 });
@@ -666,15 +692,15 @@ $('#vista-estabelecimento').addEventListener('click', ev => {
 $('#form-aula').addEventListener('submit', ev => {
   ev.preventDefault();
   const modalidadeId = parseInt($('#aula-modalidade').value);
-  const instrutorId = parseInt($('#aula-instrutor').value);
-  if (Number.isNaN(modalidadeId) || Number.isNaN(instrutorId)) {
+  const registroInstrutor = $('#aula-instrutor').value;
+  if (Number.isNaN(modalidadeId) || !registroInstrutor) {
     avisar('Cadastre uma modalidade e um instrutor antes de criar aulas.', 'erro');
     return;
   }
   executar(() => api('/aulas', 'POST', {
-    estabelecimentoId,
+    cnpj: estabelecimentoAtual().cnpj,
     modalidadeId,
-    instrutorId,
+    registroInstrutor,
     inicio: $('#aula-inicio').value,          // formato ISO local, aceito por LocalDateTime.parse
     duracaoMin: parseInt($('#aula-duracao').value),
     capacidade: parseInt($('#aula-capacidade').value)
@@ -695,7 +721,7 @@ $('#aba-grade').addEventListener('click', ev => {
     const instrutor = est.instrutores[parseInt(escolha) - 1];
     if (!instrutor) return;
     executar(() => api(`/aulas/${instrutorAula}/instrutor`, 'POST',
-      { instrutorId: instrutor.id }), `${instrutor.nome} assumiu a aula.`);
+      { registroInstrutor: instrutor.registro }), `${instrutor.nome} assumiu a aula.`);
   }
 
   if (capacidade !== undefined) {
@@ -715,12 +741,12 @@ $('#aba-grade').addEventListener('click', ev => {
 /* --- UC03 e UC04a --- */
 
 $('#aluno-atual').addEventListener('change', ev => {
-  alunoId = parseInt(ev.target.value);
+  alunoCpf = ev.target.value;
   render();
 });
 
 $('#checkin-estabelecimento').addEventListener('change', ev => {
-  checkinEstabelecimentoId = parseInt(ev.target.value);
+  checkinEstabelecimentoCnpj = ev.target.value;
   render();   // troca de estabelecimento recoloca as coordenadas da porta dele
 });
 
@@ -760,8 +786,8 @@ $('#form-checkin').addEventListener('submit', ev => {
     return;
   }
   executar(() => api('/checkins', 'POST', {
-    alunoId: aluno.id,
-    estabelecimentoId: est.id,
+    cpf: aluno.cpf,
+    cnpj: est.cnpj,
     latitude: parseFloat($('#checkin-lat').value),
     longitude: parseFloat($('#checkin-lng').value)
   }), `Check-in registrado em ${est.nome}.`);
@@ -773,7 +799,7 @@ $('#vista-aluno').addEventListener('click', ev => {
 
   if (reservar !== undefined) {
     const aula = estado.aulas.find(a => a.id === parseInt(reservar));
-    executar(() => api('/reservas', 'POST', { alunoId: aluno.id, aulaId: aula.id }),
+    executar(() => api('/reservas', 'POST', { cpf: aluno.cpf, aulaId: aula.id }),
       `Vaga reservada: ${aula.modalidade}, ${aula.inicioLegivel}.`);
   }
 
@@ -787,7 +813,7 @@ $('#vista-aluno').addEventListener('click', ev => {
           + 'O cancelamento vai ficar registrado como penalizado. Cancelar mesmo assim?')) return;
       aceitaPenalidade = true;
     }
-    executar(() => api(`/reservas/${r.id}/cancelar`, 'POST', { alunoId: aluno.id, aceitaPenalidade }),
+    executar(() => api(`/reservas/${r.id}/cancelar`, 'POST', { cpf: aluno.cpf, aceitaPenalidade }),
       'Reserva cancelada. A vaga foi liberada.');
   }
 });
@@ -795,7 +821,7 @@ $('#vista-aluno').addEventListener('click', ev => {
 /* --- UC07 --- */
 
 const caminhoRecepcao = codigo =>
-  `/recepcao/${estabelecimentoAtual().id}/checkins/${encodeURIComponent(codigo)}`;
+  `/recepcao/${estabelecimentoAtual().cnpj}/checkins/${encodeURIComponent(codigo)}`;
 
 $('#form-codigo').addEventListener('submit', ev => {
   ev.preventDefault();
@@ -810,10 +836,10 @@ $('#form-codigo').addEventListener('submit', ev => {
 /* extensão 2a: sem o código, busca pelo CPF; validar e recusar seguem pelo código achado */
 $('#form-cpf').addEventListener('submit', ev => {
   ev.preventDefault();
-  const cpf = $('#recepcao-cpf').value.replace(/\D/g, '');
+  const cpf = soDigitos($('#recepcao-cpf').value);
   conferencia = null;
   executar(async () => {
-    conferencia = await api(`/recepcao/${estabelecimentoAtual().id}/cpf/${cpf}`);
+    conferencia = await api(`/recepcao/${estabelecimentoAtual().cnpj}/cpf/${cpf}`);
     ev.target.reset();
   });
 });

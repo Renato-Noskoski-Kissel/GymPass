@@ -1,6 +1,8 @@
 package dominio.cadastroRede;
 
-import dominio.RegraDeNegocioException;
+import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDate;
 
 /**
@@ -9,43 +11,53 @@ import java.time.LocalDate;
  *
  * Aluno não conhece Plano nem Adesao: a dependência vai no sentido
  * Planos e Assinatura -> Cadastro e Rede, nunca o contrário.
+ *
+ * Persistência: herança em tabelas separadas. "alunos" tem o que é comum;
+ * "funcionarios" e "dependentes" têm o cpf como PK e FK para alunos.
+ * A coluna "tipo" registra a subclasse.
  */
+@Entity
+@Table(name = "alunos")
+@Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn(name = "tipo", discriminatorType = DiscriminatorType.STRING, length = 20)
 public abstract class Aluno {
 
-    private final String nome;
-    private final String cpf;
-    private final String email;
-    private final LocalDate dataCadastro;
+    @Id
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "cpf", length = 11)
+    private String cpf;
+
+    @Column(name = "nome", nullable = false, length = 150)
+    private String nome;
+
+    @Column(name = "email", length = 150)
+    private String email;
+
+    @Column(name = "data_cadastro", nullable = false)
+    private LocalDate dataCadastro;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "situacao", nullable = false, length = 20)
     private SituacaoAluno situacao;
+
+    /** Exigido pela JPA. */
+    protected Aluno() { }
 
     protected Aluno(String nome, String cpf, String email) {
         this.nome = nome;
-        this.cpf = formatarCpf(cpf);
+        this.cpf = Documentos.cpf(cpf);
         this.email = email;
         this.dataCadastro = LocalDate.now();
         this.situacao = SituacaoAluno.ATIVO;
     }
 
-    /** Aceita com ou sem pontuação; guarda como 000.000.000-00. Não confere dígitos verificadores. */
-    private static String formatarCpf(String cpf) {
-        String d = apenasDigitos(cpf);
-        if (d.length() != 11) {
-            throw new RegraDeNegocioException("O CPF precisa ter 11 dígitos: " + cpf);
-        }
-        return d.substring(0, 3) + "." + d.substring(3, 6) + "." + d.substring(6, 9)
-                + "-" + d.substring(9);
-    }
-
-    private static String apenasDigitos(String texto) {
-        return texto == null ? "" : texto.replaceAll("\\D", "");
-    }
-
     /** UC07 extensão 2a - este aluno tem este CPF? Ignora a pontuação. */
     public boolean temCpf(String outroCpf) {
-        return apenasDigitos(cpf).equals(apenasDigitos(outroCpf));
+        return cpf.equals(Documentos.apenasDigitos(outroCpf));
     }
 
     public String getNome() { return nome; }
+    /** Só os 11 dígitos; a formatação com pontuação é feita na tela. */
     public String getCpf() { return cpf; }
     public String getEmail() { return email; }
     public LocalDate getDataCadastro() { return dataCadastro; }

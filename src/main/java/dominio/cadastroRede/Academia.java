@@ -1,7 +1,17 @@
 package dominio.cadastroRede;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+
+@Entity
+@DiscriminatorValue("ACADEMIA")
 public class Academia extends Estabelecimento {
-    private final boolean funciona24Horas;
+    @Column(name = "funciona24_horas")
+    private boolean funciona24Horas;
+
+    /** Exigido pela JPA. */
+    protected Academia() { }
 
     public Academia(String nomeFantasia, String cnpj, double valorPorCheckIn,
                     int nivelMinimo, Endereco endereco, boolean funciona24Horas) {

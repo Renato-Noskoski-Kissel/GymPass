@@ -3,6 +3,7 @@ package dominio.planosAdesao;
 import dominio.RegraDeNegocioException;
 import dominio.cadastroRede.Empresa;
 import dominio.cadastroRede.Estabelecimento;
+import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -14,16 +15,42 @@ import java.util.List;
  * mínimo seja igual ou menor que o nível do plano, com todas as aulas de lá.
  * Estabelecimento ou plano novo já entram na regra, sem configuração.
  */
+@Entity
+@Table(name = "planos")
 public class Plano {
 
-    private final String nome;
-    private final int nivel;
-    private final double valorMensal;
-    private final int limiteAulasMes;
-    private final boolean permiteDependentes;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Integer id;
 
-    /** Empresas que oferecem este plano aos seus funcionários. */
-    private final List<Empresa> empresasQueOferecem = new ArrayList<>();
+    @Column(name = "nome", nullable = false, length = 80)
+    private String nome;
+
+    @Column(name = "nivel", nullable = false)
+    private int nivel;
+
+    @Column(name = "valor_mensal", nullable = false)
+    private double valorMensal;
+
+    @Column(name = "limite_aulas_mes", nullable = false)
+    private int limiteAulasMes;
+
+    @Column(name = "permite_dependentes", nullable = false)
+    private boolean permiteDependentes;
+
+    /**
+     * Empresas que oferecem este plano aos seus funcionários.
+     * N:N unidirecional: Empresa não conhece Plano (dependência Planos -> Cadastro).
+     */
+    @ManyToMany
+    @JoinTable(name = "planos_empresas",
+               joinColumns = @JoinColumn(name = "plano_id"),
+               inverseJoinColumns = @JoinColumn(name = "empresa_cnpj"))
+    private List<Empresa> empresasQueOferecem = new ArrayList<>();
+
+    /** Exigido pela JPA. */
+    protected Plano() { }
 
     public Plano(String nome, int nivel, double valorMensal,
                  int limiteAulasMes, boolean permiteDependentes) {
@@ -38,6 +65,7 @@ public class Plano {
         this.permiteDependentes = permiteDependentes;
     }
 
+    public Integer getId() { return id; }
     public String getNome() { return nome; }
     public int getNivel() { return nivel; }
     public double getValorMensal() { return valorMensal; }

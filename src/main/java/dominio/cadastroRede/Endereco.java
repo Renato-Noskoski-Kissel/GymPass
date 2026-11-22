@@ -1,6 +1,8 @@
 package dominio.cadastroRede;
 
 import dominio.RegraDeNegocioException;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 
 /**
  * Endereço de um estabelecimento.
@@ -8,19 +10,33 @@ import dominio.RegraDeNegocioException;
  * Composição com Estabelecimento (1 para 1): o endereço não existe fora do
  * estabelecimento que localiza. As coordenadas são usadas na validação de
  * proximidade do check-in (RN4).
+ *
+ * Persistência: objeto de valor sem tabela própria; as colunas ficam
+ * embutidas em estabelecimentos.
  */
+@Embeddable
 public class Endereco {
 
     /** Raio médio da Terra, usado na fórmula de haversine. */
     private static final double RAIO_TERRA_METROS = 6_371_000;
 
-    private final String logradouro;
-    private final String numero;
-    private final String bairro;
-    private final String cidade;
-    private final String cep;
-    private final double latitude;
-    private final double longitude;
+    @Column(name = "logradouro", nullable = false, length = 150)
+    private String logradouro;
+    @Column(name = "numero", nullable = false, length = 10)
+    private String numero;
+    @Column(name = "bairro", nullable = false, length = 80)
+    private String bairro;
+    @Column(name = "cidade", nullable = false, length = 80)
+    private String cidade;
+    @Column(name = "cep", nullable = false, length = 9)
+    private String cep;
+    @Column(name = "latitude", nullable = false)
+    private double latitude;
+    @Column(name = "longitude", nullable = false)
+    private double longitude;
+
+    /** Exigido pela JPA. */
+    protected Endereco() { }
 
     public Endereco(String logradouro, String numero, String bairro, String cidade,
                     String cep, double latitude, double longitude) {
