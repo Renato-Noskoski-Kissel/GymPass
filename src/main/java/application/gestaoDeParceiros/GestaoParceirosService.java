@@ -64,15 +64,18 @@ public class GestaoParceirosService {
         Empresa empresa = new Empresa(razaoSocial, cnpj, LocalDate.now(),
                 limiteDependentes, diaVencimento);
         repositorio.adicionarEmpresa(empresa);
-        repositorio.listarPlanos().forEach(plano -> plano.oferecerPara(empresa));
+        // Começa sem plano: a própria empresa escolhe o que oferece
+        // (BeneficiariosService.oferecerPlano). Até lá não inclui funcionários.
     }
 
+    /**
+     * O plano nasce sem ser oferecido a ninguém. Cada empresa decide se o
+     * oferece aos funcionários (BeneficiariosService.oferecerPlano).
+     */
     @Transactional
     public void criarPlano(String nome, int nivel, double valorMensal,
                            int limiteAulasMes, boolean permiteDependentes) {
-        Plano plano = new Plano(nome, nivel, valorMensal, limiteAulasMes, permiteDependentes);
-        repositorio.listarEmpresas().forEach(plano::oferecerPara);
-        repositorio.adicionarPlano(plano);
+        repositorio.adicionarPlano(new Plano(nome, nivel, valorMensal, limiteAulasMes, permiteDependentes));
     }
 
     private Estabelecimento estabelecimento(String cnpj) {

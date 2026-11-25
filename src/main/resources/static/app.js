@@ -229,6 +229,8 @@ function renderEmpresa() {
 
   /* planos que esta empresa oferece: só eles valem para incluir e trocar */
   const oferecidos = planosOferecidos(empresa);
+  /* sem plano oferecido, o required do select barraria o envio com a mensagem genérica do navegador */
+  $('#func-plano').required = oferecidos.length > 0;
   if (oferecidos.length) {
     preencherSelect($('#func-plano'), oferecidos, p => `${p.nome} — ${moeda(p.valorMensal)}`);
   } else {
@@ -912,7 +914,8 @@ $('#form-funcionario').addEventListener('submit', ev => {
   const nome = $('#func-nome').value.trim();
   const planoId = parseInt($('#func-plano').value);
   if (Number.isNaN(planoId)) {
-    avisar('Crie um plano antes de incluir funcionários.', 'erro');
+    avisar('A empresa ainda não oferece nenhum plano. Ofereça um em "Planos oferecidos" '
+      + 'antes de incluir funcionários.', 'erro');
     return;
   }
   executar(() => api(`/empresas/${empresaAtual().cnpj}/funcionarios`, 'POST', {
