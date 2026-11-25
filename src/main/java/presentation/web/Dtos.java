@@ -34,7 +34,8 @@ public class Dtos {
 
     public record EmpresaDto(String cnpj, String razaoSocial, int limiteDependentes,
                              int totalFuncionarios, int totalDependentes,
-                             int totalBeneficiarios, List<FuncionarioDto> funcionarios) {}
+                             int totalBeneficiarios, List<FuncionarioDto> funcionarios,
+                             List<Integer> planosOferecidos) {}
 
     public record PlanoDto(int id, String nome, int nivel, double valorMensal,
                            int limiteAulasMes, boolean permiteDependentes,

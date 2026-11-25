@@ -78,6 +78,17 @@ public class Plano {
         }
     }
 
+    /**
+     * A empresa deixa de oferecer este plano aos funcionários. Quem ainda está
+     * nele precisa ser trocado antes; essa checagem é da aplicação, que
+     * consulta as adesões no repositório.
+     */
+    public void deixarDeOferecerPara(Empresa empresa) {
+        if (!empresasQueOferecem.remove(empresa)) {
+            throw new RegraDeNegocioException(empresa + " já não oferece o plano " + nome + ".");
+        }
+    }
+
     /** RN1 - o plano é oferecido pela empresa do aluno? */
     public boolean ehOferecidoPor(Empresa empresa) {
         return empresasQueOferecem.contains(empresa);

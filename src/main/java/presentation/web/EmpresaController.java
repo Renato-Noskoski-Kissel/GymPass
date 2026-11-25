@@ -48,6 +48,16 @@ public class EmpresaController {
                 dados.grauParentesco());
     }
 
+    @PostMapping("/planos/{planoId}")
+    public void oferecerPlano(@PathVariable String cnpjEmpresa, @PathVariable int planoId) {
+        servico.oferecerPlano(cnpjEmpresa, planoId);
+    }
+
+    @DeleteMapping("/planos/{planoId}")
+    public void retirarPlano(@PathVariable String cnpjEmpresa, @PathVariable int planoId) {
+        servico.retirarPlano(cnpjEmpresa, planoId);
+    }
+
     @DeleteMapping("/funcionarios/{cpf}")
     public void removerFuncionario(@PathVariable String cnpjEmpresa, @PathVariable String cpf) {
         servico.removerFuncionario(cnpjEmpresa, cpf);

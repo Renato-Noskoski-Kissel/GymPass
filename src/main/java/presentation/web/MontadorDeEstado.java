@@ -105,9 +105,11 @@ public class MontadorDeEstado {
                         deps));
             }
 
+            List<Integer> oferecidos = repositorio.listarPlanos().stream()
+                    .filter(p -> p.ehOferecidoPor(emp)).map(Plano::getId).toList();
             saida.add(new EmpresaDto(emp.getCnpj(), emp.getRazaoSocial(), emp.getLimiteDependentes(),
                     emp.getTotalFuncionarios(), emp.getTotalDependentes(),
-                    emp.getTotalBeneficiarios(), funcs));
+                    emp.getTotalBeneficiarios(), funcs, oferecidos));
         }
         return saida;
     }

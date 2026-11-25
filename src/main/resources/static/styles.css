@@ -297,8 +297,8 @@ body {
 .detalhe-cobertura { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; margin-top: .3rem; }
 
 /* no celular, selo e botão descem para baixo do resumo em vez de espremê-lo */
-#resumo-assinatura .item { flex-wrap: wrap; }
-#resumo-assinatura .item-corpo { flex-basis: 220px; }
+#resumo-assinatura .item, #planos-empresa .item { flex-wrap: wrap; }
+#resumo-assinatura .item-corpo, #planos-empresa .item-corpo { flex-basis: 220px; }
 
 /* ---------- indicadores ---------- */
 

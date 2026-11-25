@@ -40,6 +40,8 @@ class Controllers <<fachada>> {
   +trocarPlano(cnpjEmpresa : String, cpf : String, dados : TrocaDePlano) : void
   +incluirDependente(cnpjEmpresa : String, cpfFuncionario : String, dados : NovoDependente) : void
   +removerFuncionario(cnpjEmpresa : String, cpf : String) : void
+  +oferecerPlano(cnpjEmpresa : String, planoId : int) : void
+  +retirarPlano(cnpjEmpresa : String, planoId : int) : void
   +suspenderBeneficio(cnpjEmpresa : String, cpf : String) : void
   +reativarBeneficio(cnpjEmpresa : String, cpf : String) : void
   .. EstabelecimentoController ..
@@ -95,6 +97,8 @@ class Services <<fachada>> {
   +removerFuncionario(cnpjEmpresa : String, cpf : String) : void
   +suspenderAdesao(cnpjEmpresa : String, cpf : String) : void
   +reativarAdesao(cnpjEmpresa : String, cpf : String) : void
+  +oferecerPlano(cnpjEmpresa : String, planoId : int) : void
+  +retirarPlano(cnpjEmpresa : String, planoId : int) : void
   .. plano (AssinaturaService) ..
   +planosDisponiveis(cpf : String) : List<Plano>
   +assinaturaVigente(cpf : String) : Adesao
@@ -183,6 +187,7 @@ package "Planos e Adesão" {
     -permiteDependentes : boolean
     -empresasQueOferecem : List<Empresa>
     +oferecerPara(e : Empresa) : void
+    +deixarDeOferecerPara(e : Empresa) : void
     +ehOferecidoPor(e : Empresa) : boolean
     +libera(e : Estabelecimento) : boolean
     +permiteDependentes() : boolean

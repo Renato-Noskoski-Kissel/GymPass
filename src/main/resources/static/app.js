@@ -142,6 +142,7 @@ function barraDeVagas(aula) {
 }
 
 const empresaAtual = () => estado.empresas.find(e => e.cnpj === empresaCnpj) || estado.empresas[0];
+const planosOferecidos = empresa => estado.planos.filter(p => empresa.planosOferecidos.includes(p.id));
 const estabelecimentoAtual = () =>
   estado.estabelecimentos.find(e => e.cnpj === estabelecimentoCnpj) || estado.estabelecimentos[0];
 
@@ -226,7 +227,33 @@ function renderEmpresa() {
       <div class="indicador-rotulo">pessoas com benefício</div>
     </div>`;
 
-  preencherSelect($('#func-plano'), estado.planos, p => `${p.nome} — ${moeda(p.valorMensal)}`);
+  /* planos que esta empresa oferece: só eles valem para incluir e trocar */
+  const oferecidos = planosOferecidos(empresa);
+  if (oferecidos.length) {
+    preencherSelect($('#func-plano'), oferecidos, p => `${p.nome} — ${moeda(p.valorMensal)}`);
+  } else {
+    $('#func-plano').innerHTML = '<option value="">Nenhum plano oferecido</option>';
+  }
+
+  $('#cont-planos-empresa').textContent = `${oferecidos.length} de ${estado.planos.length}`;
+  $('#planos-empresa').innerHTML = estado.planos.length
+    ? estado.planos.map(p => {
+        const oferecido = empresa.planosOferecidos.includes(p.id);
+        const nele = empresa.funcionarios.filter(f => f.plano === p.nome).length;
+        return `<div class="item">
+          <div class="item-corpo">
+            <div class="item-nome">${p.nome} · ${moeda(p.valorMensal)} por mês</div>
+            <div class="item-detalhe">Nível ${p.nivel} · ${p.limiteAulasMes} aulas por mês · ${
+              p.permiteDependentes ? 'aceita dependentes' : 'sem dependentes'}</div>
+            <div class="item-detalhe">${nele ? `${nele} funcionário${nele > 1 ? 's' : ''} neste plano` : 'Ninguém neste plano'}</div>
+          </div>
+          ${oferecido ? selo('Oferecido', 'aprovado') : selo('Não oferecido', 'inativo')}
+          ${oferecido
+            ? `<button class="acao discreta risco" data-retirar-plano="${p.id}">Deixar de oferecer</button>`
+            : `<button class="acao discreta" data-oferecer-plano="${p.id}">Oferecer</button>`}
+        </div>`;
+      }).join('')
+    : '<p class="vazio">O administrador ainda não criou nenhum plano.</p>';
 
   $('#cont-funcionarios').textContent = `${empresa.totalFuncionarios} no quadro`;
 
@@ -571,11 +598,11 @@ function cancelarAssinatura(aluno) {
 const distancia = m => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
 const tipoLegivel = t => t === 'Estudio' ? 'Estúdio' : t;
 
-/** Passo 3b: modalidades cadastradas na rede credenciada, sem repetir nomes. */
+/** Passo 3b: todas as modalidades cadastradas no sistema, sem repetir nomes. */
 function preencherModalidades() {
   const el = $('#busca-modalidade');
   const atual = el.value;
-  const nomes = [...new Map(credenciados()
+  const nomes = [...new Map(estado.estabelecimentos
     .flatMap(e => e.modalidades.map(m => [m.nome.toLowerCase(), m.nome]))).values()]
     .sort((a, b) => a.localeCompare(b, 'pt-BR'));
   el.innerHTML = '<option value="">Todas</option>'
@@ -585,27 +612,26 @@ function preencherModalidades() {
 /* coordenadas que o dispositivo pôs nos campos; se o aluno editar, passam a ser digitadas */
 let doDispositivo = null;
 
-/** Passo 2 e extensão 2a: sem coordenadas digitadas, pede a localização ao dispositivo. */
-function obterReferencia() {
-  const lat = $('#busca-lat').value, lng = $('#busca-lng').value;
-  if (lat !== '' && lng !== '') {
-    const origem = doDispositivo === `${lat},${lng}` ? 'dispositivo' : 'digitada';
-    return Promise.resolve({ latitude: parseFloat(lat), longitude: parseFloat(lng), origem });
+/** Passo 2: a mesma localização do check-in, posta nos campos de referência da busca. */
+async function localizarParaBusca() {
+  try {
+    const c = await localizacaoDoNavegador('Digite a latitude e a longitude de referência.');
+    $('#busca-lat').value = c.latitude.toFixed(6);
+    $('#busca-lng').value = c.longitude.toFixed(6);
+    doDispositivo = `${$('#busca-lat').value},${$('#busca-lng').value}`;
+  } catch (e) {
+    $('#busca-lat').focus();   // extensão 2a: o aluno digita a referência
+    throw new Error(e.message.includes('Digite') ? e.message
+      : e.message + ' Digite a latitude e a longitude de referência.');
   }
-  return new Promise((ok, falha) => {
-    const semLocalizacao = () => falha(new Error(
-      'Não foi possível usar a localização do dispositivo. Digite a latitude e a longitude de referência.'));
-    if (!navigator.geolocation) return semLocalizacao();
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        $('#busca-lat').value = pos.coords.latitude.toFixed(6);
-        $('#busca-lng').value = pos.coords.longitude.toFixed(6);
-        doDispositivo = `${$('#busca-lat').value},${$('#busca-lng').value}`;
-        ok({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, origem: 'dispositivo' });
-      },
-      semLocalizacao,
-      { enableHighAccuracy: true, timeout: 10000 });
-  });
+}
+
+/** Passo 2 e extensão 2a: sem coordenadas nos campos, pede a localização ao dispositivo. */
+async function obterReferencia() {
+  if ($('#busca-lat').value === '' || $('#busca-lng').value === '') await localizarParaBusca();
+  const lat = $('#busca-lat').value, lng = $('#busca-lng').value;
+  const origem = doDispositivo === `${lat},${lng}` ? 'dispositivo' : 'digitada';
+  return { latitude: parseFloat(lat), longitude: parseFloat(lng), origem };
 }
 
 /** Passo 3: lê os filtros da tela. Dia e horário viram a faixa [inicio, fim). */
@@ -899,14 +925,33 @@ $('#form-funcionario').addEventListener('submit', ev => {
 });
 
 $('#vista-empresa').addEventListener('click', ev => {
-  const { trocar, remover, dependente, suspender, reativar } = ev.target.dataset;
+  const { trocar, remover, dependente, suspender, reativar, oferecerPlano, retirarPlano } =
+    ev.target.dataset;
   const empresa = empresaAtual();
   const base = `/empresas/${empresa.cnpj}/funcionarios`;
 
+  if (oferecerPlano !== undefined) {
+    const plano = estado.planos.find(p => p.id === parseInt(oferecerPlano));
+    executar(() => api(`/empresas/${empresa.cnpj}/planos/${plano.id}`, 'POST'),
+      `${empresa.razaoSocial} passou a oferecer o plano ${plano.nome}.`);
+  }
+
+  if (retirarPlano !== undefined) {
+    const plano = estado.planos.find(p => p.id === parseInt(retirarPlano));
+    if (!confirm(`Deixar de oferecer o plano ${plano.nome} aos funcionários de ${empresa.razaoSocial}?`)) return;
+    executar(() => api(`/empresas/${empresa.cnpj}/planos/${plano.id}`, 'DELETE'),
+      `${empresa.razaoSocial} deixou de oferecer o plano ${plano.nome}.`);
+  }
+
   if (trocar !== undefined) {
-    const nomes = estado.planos.map((p, i) => `${i + 1}. ${p.nome}`).join('\n');
+    const opcoes = planosOferecidos(empresa);
+    if (!opcoes.length) {
+      avisar('A empresa não oferece nenhum plano. Ofereça um plano antes de trocar.', 'erro');
+      return;
+    }
+    const nomes = opcoes.map((p, i) => `${i + 1}. ${p.nome}`).join('\n');
     const escolha = prompt(`Novo plano:\n${nomes}`, '1');
-    const plano = estado.planos[parseInt(escolha) - 1];
+    const plano = opcoes[parseInt(escolha) - 1];
     if (!plano) return;
     executar(() => api(`${base}/${trocar}/plano`, 'POST',
       { planoId: plano.id }), `Plano alterado para ${plano.nome}.`);
@@ -1064,21 +1109,34 @@ $('#loc-longe').addEventListener('click', () => {
   if (est) preencherCoordenadas(est.latitude + 0.009, est.longitude);   // ~1 km ao norte
 });
 
-/* Validar Localização do Dispositivo: no sistema web, quem fornece é o navegador. */
+/**
+ * Validar Localização do Dispositivo: no sistema web, quem fornece é o navegador.
+ * Usada pelo check-in (UC03) e pela busca (UC02 passo 2). Resolve com
+ * { latitude, longitude }; rejeita com a mensagem para mostrar ao aluno.
+ * dica: o que o aluno pode fazer se a permissão for negada.
+ */
+function localizacaoDoNavegador(dica) {
+  return new Promise((ok, falha) => {
+    if (!navigator.geolocation) {
+      falha(new Error('Este navegador não fornece localização.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => ok({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      erro => falha(new Error(erro.code === erro.PERMISSION_DENIED
+        ? `A permissão de localização foi negada. ${dica}`
+        : 'Não foi possível obter a localização do navegador.')),
+      { enableHighAccuracy: true, timeout: 10000 });
+  });
+}
+
 $('#loc-navegador').addEventListener('click', () => {
-  if (!navigator.geolocation) {
-    avisar('Este navegador não fornece localização.', 'erro');
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      preencherCoordenadas(pos.coords.latitude, pos.coords.longitude);
+  localizacaoDoNavegador('Ela é obrigatória para o check-in: libere no navegador e tente de novo.')
+    .then(c => {
+      preencherCoordenadas(c.latitude, c.longitude);
       avisar('Localização do navegador obtida.');
-    },
-    erro => avisar(erro.code === erro.PERMISSION_DENIED
-      ? 'A permissão de localização é obrigatória para o check-in. Libere no navegador e tente de novo.'
-      : 'Não foi possível obter a localização do navegador.', 'erro'),
-    { enableHighAccuracy: true, timeout: 10000 });
+    })
+    .catch(e => avisar(e.message, 'erro'));
 });
 
 /* --- UC02 --- */
@@ -1091,21 +1149,14 @@ $('#form-busca').addEventListener('submit', async ev => {
     buscar(aluno, lerFiltros(await obterReferencia()));
   } catch (e) {
     avisar(e.message, 'erro');   // 2a: sem localização, pede as coordenadas
-    $('#busca-lat').focus();
   }
 });
 
 /* Passo 2: pede a localização ao dispositivo, mesmo que já haja coordenadas digitadas. */
-$('#busca-localizar').addEventListener('click', async () => {
-  $('#busca-lat').value = '';
-  $('#busca-lng').value = '';
-  try {
-    await obterReferencia();
-    avisar('Localização do dispositivo obtida.');
-  } catch (e) {
-    avisar(e.message, 'erro');
-    $('#busca-lat').focus();
-  }
+$('#busca-localizar').addEventListener('click', () => {
+  localizarParaBusca()
+    .then(() => avisar('Localização do navegador obtida.'))
+    .catch(e => avisar(e.message, 'erro'));
 });
 
 $('#form-checkin').addEventListener('submit', ev => {

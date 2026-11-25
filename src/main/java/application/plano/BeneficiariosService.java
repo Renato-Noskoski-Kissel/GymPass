@@ -105,6 +105,39 @@ public class BeneficiariosService {
         adesoesVigentesDosDependentes(cnpjEmpresa, cpf).forEach(Adesao::reativar);
     }
 
+    /** UC01 - a empresa escolhe quais planos os funcionários podem assinar. */
+    @Transactional
+    public void oferecerPlano(String cnpjEmpresa, int planoId) {
+        Empresa empresa = empresa(cnpjEmpresa);
+        Plano plano = plano(planoId);
+        if (plano.ehOferecidoPor(empresa)) {
+            throw new RegraDeNegocioException(empresa + " já oferece o plano " + plano.getNome() + ".");
+        }
+        plano.oferecerPara(empresa);
+    }
+
+    /**
+     * Ninguém fica num plano que a empresa não oferece: enquanto houver
+     * funcionário com adesão vigente nele, a retirada é recusada. Os
+     * dependentes seguem o titular (RN3), então basta olhar os funcionários.
+     */
+    @Transactional
+    public void retirarPlano(String cnpjEmpresa, int planoId) {
+        Empresa empresa = empresa(cnpjEmpresa);
+        Plano plano = plano(planoId);
+        long noPlano = empresa.getFuncionarios().stream()
+                .map(repositorio::adesaoDe)
+                .filter(a -> a != null && a.getPlano().equals(plano))
+                .count();
+        if (noPlano > 0) {
+            throw new RegraDeNegocioException((noPlano == 1
+                    ? "1 funcionário está no plano " + plano.getNome() + ". Troque o plano dele"
+                    : noPlano + " funcionários estão no plano " + plano.getNome() + ". Troque o plano deles")
+                + " antes de deixar de oferecê-lo.");
+        }
+        plano.deixarDeOferecerPara(empresa);
+    }
+
     private List<Adesao> adesoesVigentesDosDependentes(String cnpjEmpresa, String cpf) {
         return funcionario(cnpjEmpresa, cpf).getDependentes().stream()
                 .map(repositorio::adesaoDe)
