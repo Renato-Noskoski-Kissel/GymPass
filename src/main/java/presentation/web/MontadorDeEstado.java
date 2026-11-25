@@ -67,6 +67,14 @@ public class MontadorDeEstado {
         return saida;
     }
 
+    /** UC02 passos 5 e 6 - distância a partir da referência e cobertura pelo plano (RF5). */
+    public ResultadoBuscaDto resultadoBusca(Estabelecimento e, Plano plano, double lat, double lng) {
+        return new ResultadoBuscaDto(e.getCnpj(), e.getNomeFantasia(), tipoDe(e),
+                e.getEndereco().toString(), e.getEndereco().distanciaAte(lat, lng),
+                plano.libera(e), e.getNivelMinimo(),
+                e.getModalidades().stream().map(Modalidade::getNome).toList());
+    }
+
     private String tipoDe(Estabelecimento e) {
         if (e instanceof Academia) return "Academia";
         if (e instanceof Estudio) return "Estudio";
@@ -105,13 +113,35 @@ public class MontadorDeEstado {
     }
 
     private List<PlanoDto> planos() {
+        return planos(repositorio.listarPlanos());
+    }
+
+    /** UC01 passo 3 - também usado para os planos que a empresa do aluno oferece. */
+    public List<PlanoDto> planos(List<Plano> planos) {
         List<PlanoDto> saida = new ArrayList<>();
         List<Estabelecimento> rede = repositorio.listarEstabelecimentos();
-        for (Plano p : repositorio.listarPlanos()) {
-            saida.add(new PlanoDto(p.getId(), p.getNome(), p.getNivel(), p.getValorMensal(),
-                    p.getLimiteAulasMes(), p.permiteDependentes(), coberturaDe(p, rede)));
+        for (Plano p : planos) {
+            saida.add(planoDto(p, rede));
         }
         return saida;
+    }
+
+    private PlanoDto planoDto(Plano p, List<Estabelecimento> rede) {
+        return new PlanoDto(p.getId(), p.getNome(), p.getNivel(), p.getValorMensal(),
+                p.getLimiteAulasMes(), p.permiteDependentes(), coberturaDe(p, rede));
+    }
+
+    /** UC01 passo 7 - resumo da assinatura, com os dependentes que continuam cobertos. */
+    public AssinaturaDto assinatura(Adesao a) {
+        List<String> dependentes = new ArrayList<>();
+        if (a.getAluno() instanceof Funcionario f) {
+            for (Dependente d : f.getDependentes()) {
+                if (d.estaAtivo() && repositorio.adesaoDe(d) != null) dependentes.add(d.getNome());
+            }
+        }
+        return new AssinaturaDto(a.getId(),
+                planoDto(a.getPlano(), repositorio.listarEstabelecimentos()),
+                a.getDataInicio().toString(), a.getSituacao().name(), dependentes);
     }
 
     /** RF5 - nomes dos estabelecimentos que o nível do plano alcança. */
@@ -126,20 +156,31 @@ public class MontadorDeEstado {
     private List<AulaDto> aulas() {
         List<AulaDto> saida = new ArrayList<>();
         for (Aula a : repositorio.listarAulas()) {
-            saida.add(new AulaDto(a.getId(),
-                    a.getDataHoraInicio().format(ISO),
-                    a.getDataHoraInicio().format(LEGIVEL),
-                    a.getDuracao().toMinutes(),
-                    a.getCapacidadeMaxima(),
-                    a.vagasDisponiveis(),
-                    a.getModalidade().getNome(),
-                    a.getInstrutor().getNome(),
-                    a.estaCancelada(),
-                    a.jaComecou(),
-                    a.getEstabelecimento().getCnpj(),
-                    a.getEstabelecimento().getNomeFantasia()));
+            saida.add(aulaDto(a));
         }
         return saida;
+    }
+
+    private AulaDto aulaDto(Aula a) {
+        return new AulaDto(a.getId(),
+                a.getDataHoraInicio().format(ISO),
+                a.getDataHoraInicio().format(LEGIVEL),
+                a.getDuracao().toMinutes(),
+                a.getCapacidadeMaxima(),
+                a.vagasDisponiveis(),
+                a.getModalidade().getNome(),
+                a.getInstrutor().getNome(),
+                a.estaCancelada(),
+                a.jaComecou(),
+                a.getEstabelecimento().getCnpj(),
+                a.getEstabelecimento().getNomeFantasia());
+    }
+
+    /** UC02 passo 7 - detalhe do estabelecimento com a grade do período (7e). */
+    public DetalheEstabelecimentoDto detalhe(Estabelecimento e, Plano plano, double lat, double lng,
+                                             LocalDateTime inicio, LocalDateTime fim) {
+        return new DetalheEstabelecimentoDto(resultadoBusca(e, plano, lat, lng), plano.getNivel(),
+                e.aulasEntre(inicio, fim).stream().map(this::aulaDto).toList());
     }
 
     private List<AlunoDto> alunos() {

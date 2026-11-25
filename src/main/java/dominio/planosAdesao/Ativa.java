@@ -11,6 +11,7 @@ import dominio.cadastroRede.Funcionario;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 
 /** Estado em que o benefício pode ser usado normalmente. */
@@ -41,7 +42,7 @@ public class Ativa implements EstadoAdesao {
                 "O plano " + plano.getNome() + " não permite dependentes (RN3).");
         }
         int limite = funcionario.getEmpresaVinculada().getLimiteDependentes();
-        if (funcionario.getDependentes().size() >= limite) {
+        if (dependentesAtivos(funcionario).size() >= limite) {
             throw new RegraDeNegocioException(
                 "Limite de dependentes da empresa atingido (RN3): " + limite);
         }
@@ -119,30 +120,41 @@ public class Ativa implements EstadoAdesao {
     }
 
     /**
-     * HU2 - troca do nível de plano do funcionário.
+     * HU2 e UC01 - troca do nível de plano. A adesão anterior é encerrada com
+     * data de fim e fica guardada; a nova começa hoje.
      *
-     * Com multiplicidade 1, a adesão anterior é substituída e não é preservada.
-     * Se o histórico passar a ser necessário (cálculo de fatura por período),
-     * a multiplicidade precisará mudar para 1..*.
+     * UC01 5a (RN3): só contam os dependentes ativos. Se o novo plano não os
+     * permite, a troca é recusada com a lista de quem perderia o acesso; se o
+     * aluno confirmar, a aplicação remove esses dependentes e tenta de novo.
      */
     @Override
     public Adesao trocarPlano(Adesao ad, Plano novoPlano) {
         Aluno aluno = ad.getAluno();
+        if (!aluno.ehElegivel()) {
+            throw new RegraDeNegocioException(
+                "O vínculo de " + aluno + " com o benefício não está ativo (RN1).");
+        }
         if (!novoPlano.ehOferecidoPor(aluno.getEmpresaVinculada())) {
             throw new RegraDeNegocioException(
                 "A empresa " + aluno.getEmpresaVinculada()
                 + " não oferece o plano " + novoPlano.getNome());
         }
-        if (aluno instanceof Funcionario funcionario
-                && !funcionario.getDependentes().isEmpty()
-                && !novoPlano.permiteDependentes()) {
-            throw new RegraDeNegocioException(
-                "O plano " + novoPlano.getNome() + " não permite dependentes (RN3). "
-                + "Antes de trocar de plano, remova os dependentes de " + funcionario
-                + " (" + funcionario.getDependentes().size() + " no total).");
+        if (aluno instanceof Funcionario funcionario && !novoPlano.permiteDependentes()) {
+            List<Dependente> afetados = dependentesAtivos(funcionario);
+            if (!afetados.isEmpty()) {
+                throw new DependentesPerdemAcessoException(novoPlano, afetados);
+            }
         }
         encerrar(ad);
         return new Adesao(aluno, novoPlano);
+    }
+
+    /**
+     * RN3 - dependentes que ainda têm acesso. Um dependente removido continua
+     * ligado ao responsável no banco (dependentes.responsavel_cpf), só que inativo.
+     */
+    private List<Dependente> dependentesAtivos(Funcionario funcionario) {
+        return funcionario.getDependentes().stream().filter(Aluno::estaAtivo).toList();
     }
 
     /** UC03 5b e UC04a 2b - informa qual nível seria necessário. */

@@ -381,8 +381,8 @@
     <!-- ============ UC03 e UC04a: aluno ============ -->
     <section class="vista oculta" id="vista-aluno">
       <div class="vista-cabeca">
-        <h1>Check-in e reservas</h1>
-        <p>Faça check-in ao chegar no estabelecimento e reserve vaga nas aulas com turma limitada.</p>
+        <h1>Plano, check-in e reservas</h1>
+        <p>Escolha o seu plano, faça check-in ao chegar no estabelecimento e reserve vaga nas aulas com turma limitada.</p>
       </div>
 
       <div class="seletor">
@@ -391,6 +391,88 @@
       </div>
 
       <div class="indicadores" id="indicadores-aluno"></div>
+
+      <!-- UC02: buscar estabelecimentos -->
+      <article class="bloco largo">
+        <div class="bloco-cabeca">
+          <h2>Onde treinar</h2>
+          <span class="contagem" id="cont-busca"></span>
+        </div>
+
+        <form class="formulario inicial" id="form-busca">
+          <div class="campo">
+            <label>Referência</label>
+            <div class="item-detalhe" id="busca-referencia">Use a localização do dispositivo ou digite as coordenadas.</div>
+          </div>
+          <div class="par">
+            <div class="campo">
+              <label for="busca-lat">Latitude</label>
+              <input id="busca-lat" type="number" step="any" min="-90" max="90" placeholder="-27,60">
+            </div>
+            <div class="campo">
+              <label for="busca-lng">Longitude</label>
+              <input id="busca-lng" type="number" step="any" min="-180" max="180" placeholder="-48,52">
+            </div>
+          </div>
+          <div class="botoes">
+            <button class="acao discreta" type="button" id="busca-localizar">Usar minha localização</button>
+          </div>
+
+          <div class="par">
+            <div class="campo estreito">
+              <label for="busca-raio">Raio (km)</label>
+              <input id="busca-raio" type="number" step="0.5" min="0.5" value="5" required>
+            </div>
+            <div class="campo">
+              <label for="busca-tipo">Tipo</label>
+              <select id="busca-tipo">
+                <option value="">Todos</option>
+                <option value="Academia">Academia</option>
+                <option value="Estudio">Estúdio</option>
+                <option value="Quadra">Quadra</option>
+              </select>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="busca-modalidade">Modalidade</label>
+            <select id="busca-modalidade"></select>
+          </div>
+          <div class="campo">
+            <label for="busca-dia">Dia</label>
+            <input id="busca-dia" type="date">
+          </div>
+          <div class="par">
+            <div class="campo">
+              <label for="busca-de">Das</label>
+              <input id="busca-de" type="time">
+            </div>
+            <div class="campo">
+              <label for="busca-ate">Até</label>
+              <input id="busca-ate" type="time">
+            </div>
+          </div>
+          <div class="campo checkbox">
+            <label for="busca-cobertos">
+              <input id="busca-cobertos" type="checkbox">
+              Só os cobertos pelo meu plano
+            </label>
+          </div>
+          <button class="acao" type="submit">Buscar</button>
+        </form>
+
+        <div id="resultado-busca"></div>
+      </article>
+
+      <!-- UC01: escolher, trocar ou cancelar o plano -->
+      <article class="bloco largo">
+        <div class="bloco-cabeca">
+          <h2>Meu plano</h2>
+          <span class="contagem" id="cont-meu-plano"></span>
+        </div>
+        <div id="resumo-assinatura" class="lista"></div>
+        <p class="lista-titulo">Planos oferecidos pela sua empresa</p>
+        <div id="planos-aluno" class="planos"></div>
+      </article>
 
       <div class="colunas">
         <article class="bloco">

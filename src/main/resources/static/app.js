@@ -33,6 +33,9 @@ let alunoCpf = null;
 let checkinEstabelecimentoCnpj = null;
 let coordenadasDe = null;   // cnpj do estabelecimento cujas coordenadas estão nos campos do check-in
 let conferencia = null;     // UC07: check-in localizado pela recepção (código, aluno, quando)
+let meuPlano = { cpf: null, assinatura: null };   // UC01: última assinatura carregada do aluno
+/* UC02: filtros e resultado da última busca; detalhe = estabelecimento aberto (ou null) */
+let busca = { cpf: null, filtros: null, resultados: null, erro: null, detalhe: null };
 
 /* ---------- comunicação com o servidor ---------- */
 
@@ -47,11 +50,15 @@ async function api(caminho, metodo = 'GET', corpo = null) {
 
   if (!resposta.ok) {
     let mensagem = 'Não foi possível concluir a operação.';
+    let corpo = null;
     try {
-      const erro = await resposta.json();
-      if (erro && erro.mensagem) mensagem = erro.mensagem;
+      corpo = await resposta.json();
+      if (corpo && corpo.mensagem) mensagem = corpo.mensagem;
     } catch (_) { /* resposta sem corpo JSON */ }
-    throw new Error(mensagem);
+    const falha = new Error(mensagem);
+    falha.status = resposta.status;   // UC01 5a: 409 pede confirmação
+    falha.corpo = corpo;
+    throw falha;
   }
 
   const texto = await resposta.text();
@@ -178,18 +185,24 @@ function renderAdmin() {
 
   $('#cont-planos').textContent = `${estado.planos.length} níveis`;
   $('#lista-planos').innerHTML = estado.planos.length
-    ? estado.planos.map(p => `<div class="plano">
-        <div class="plano-nome">${p.nome}</div>
-        <div class="plano-nivel">${[1,2,3,4,5].map(n =>
-          `<i class="${n <= p.nivel ? 'cheio' : ''}"></i>`).join('')}</div>
-        <div class="plano-valor">${moeda(p.valorMensal)} <small>por mês</small></div>
-        <div class="plano-detalhe">${p.limiteAulasMes} aulas por mês</div>
-        <div class="plano-detalhe">${p.permiteDependentes ? 'Aceita dependentes' : 'Sem dependentes'}</div>
-        <div class="plano-cobre">${p.cobertura.length
-          ? 'Cobre: ' + p.cobertura.join(', ')
-          : '<p class="vazio">Não cobre nenhum estabelecimento</p>'}</div>
-      </div>`).join('')
+    ? estado.planos.map(p => cartaoPlano(p)).join('')
     : '<p class="vazio">Nenhum plano configurado. Sem plano não é possível incluir beneficiários.</p>';
+}
+
+/** Card de plano, usado pela administração e pelo aluno (UC01 passo 3). */
+function cartaoPlano(p, classeExtra = '', rodape = '') {
+  return `<div class="plano${classeExtra}">
+    <div class="plano-nome">${p.nome}</div>
+    <div class="plano-nivel">${[1,2,3,4,5].map(n =>
+      `<i class="${n <= p.nivel ? 'cheio' : ''}"></i>`).join('')}</div>
+    <div class="plano-valor">${moeda(p.valorMensal)} <small>por mês</small></div>
+    <div class="plano-detalhe">${p.limiteAulasMes} aulas por mês</div>
+    <div class="plano-detalhe">${p.permiteDependentes ? 'Aceita dependentes' : 'Sem dependentes'}</div>
+    <div class="plano-cobre">${p.cobertura.length
+      ? 'Cobre: ' + p.cobertura.join(', ')
+      : '<p class="vazio">Não cobre nenhum estabelecimento</p>'}</div>
+    ${rodape}
+  </div>`;
 }
 
 /* ---------- HU2: empresa ---------- */
@@ -343,6 +356,11 @@ function renderAluno() {
       <div class="indicador-rotulo">vínculo com o benefício</div>
     </div>`;
 
+  carregarMeuPlano(aluno);
+  renderBusca(aluno);
+  /* depois de reservar pelo detalhe, as vagas mudaram: recarrega o detalhe aberto */
+  if (busca.detalhe) abrirDetalhe(aluno, busca.detalhe.estabelecimento.cnpj);
+
   /* check-in */
   const meusCheckIns = estado.checkIns.filter(c => c.alunoCpf === aluno.cpf);
   $('#cont-checkins').textContent = `${meusCheckIns.length} registrados`;
@@ -436,6 +454,292 @@ function renderAluno() {
 }
 
 /* ---------- UC07: recepção ---------- */
+
+/* ---------- UC01: meu plano ---------- */
+
+const dataLegivel = iso => new Date(iso + 'T00:00').toLocaleDateString('pt-BR');
+
+/**
+ * Planos e assinatura vêm de rotas próprias do aluno, não do /api/estado.
+ * Se o aluno selecionado mudou enquanto a resposta vinha, ela é descartada.
+ */
+async function carregarMeuPlano(aluno) {
+  if (meuPlano.cpf !== aluno.cpf) {
+    $('#resumo-assinatura').innerHTML = '<p class="vazio">Carregando…</p>';
+    $('#planos-aluno').innerHTML = '';
+  }
+  const [assinatura, planos] = await Promise.allSettled([
+    api(`/alunos/${aluno.cpf}/assinatura`),
+    api(`/alunos/${aluno.cpf}/planos`)
+  ]);
+  if (alunoAtual()?.cpf !== aluno.cpf || vistaAtual !== 'aluno') return;
+  meuPlano = { cpf: aluno.cpf, assinatura: assinatura.value ?? null };
+  renderMeuPlano(aluno, meuPlano.assinatura, planos);
+}
+
+function renderMeuPlano(aluno, assinatura, planos) {
+  const titular = aluno.tipo !== 'Dependente';
+
+  /* passo 7: resumo da assinatura vigente */
+  $('#cont-meu-plano').textContent = assinatura ? `desde ${dataLegivel(assinatura.dataInicio)}` : '';
+  if (assinatura) {
+    const suspensa = assinatura.situacao === 'SUSPENSA';
+    const deps = assinatura.dependentes.length
+      ? `Dependentes cobertos: ${assinatura.dependentes.join(', ')}`
+      : (titular && assinatura.plano.permiteDependentes ? 'Nenhum dependente cadastrado' : '');
+    $('#resumo-assinatura').innerHTML = `<div class="item">
+        <div class="item-corpo">
+          <div class="item-nome">${assinatura.plano.nome} · ${moeda(assinatura.plano.valorMensal)} por mês</div>
+          <div class="item-detalhe">Nível ${assinatura.plano.nivel} · ${assinatura.plano.limiteAulasMes} aulas por mês</div>
+          ${deps ? `<div class="item-detalhe">${deps}</div>` : ''}
+          ${suspensa ? '<div class="item-detalhe alerta">Suspenso por inadimplência da empresa (RN7).</div>' : ''}
+          ${titular ? '' : '<div class="item-detalhe">Seu plano acompanha o do titular (RN3).</div>'}
+        </div>
+        ${suspensa ? selo('Suspensa', 'suspenso') : selo('Ativa', 'aprovado')}
+        ${titular ? '<button class="acao discreta risco" data-cancelar-assinatura>Cancelar assinatura</button>' : ''}
+      </div>`;
+  } else {
+    $('#resumo-assinatura').innerHTML = titular
+      ? '<p class="vazio">Você não tem assinatura vigente. Escolha um plano abaixo.</p>'
+      : '<p class="vazio">Você não tem assinatura vigente. Seu plano acompanha o do titular (RN3).</p>';
+  }
+
+  /* passos 1 a 3, com as extensões 2a (sem vínculo) e 3a (nenhum plano) */
+  if (planos.status === 'rejected') {
+    $('#planos-aluno').innerHTML = `<p class="vazio">${planos.reason.message}</p>`;
+    return;
+  }
+  if (!planos.value.length) {
+    $('#planos-aluno').innerHTML =
+      '<p class="vazio">Sua empresa ainda não oferece nenhum plano. Procure o RH.</p>';
+    return;
+  }
+  $('#planos-aluno').innerHTML = planos.value.map(p => {
+    const atual = assinatura && assinatura.plano.id === p.id;
+    const rodape = atual
+      ? `<div class="plano-acao">${selo('Seu plano', 'aprovado')}</div>`
+      : titular
+        ? `<div class="plano-acao"><button class="acao discreta" data-assinar-plano="${p.id}">${
+            assinatura ? 'Trocar para este' : 'Assinar'}</button></div>`
+        : '';
+    return cartaoPlano(p, atual ? ' atual' : '', rodape);
+  }).join('');
+}
+
+/**
+ * Passos 4 a 6. Se o servidor responder 409 (5a), mostra quem perde o acesso
+ * e repete o pedido só se o aluno confirmar.
+ */
+function assinarPlano(aluno, planoId) {
+  const plano = estado.planos.find(p => p.id === planoId);
+  const atual = meuPlano.assinatura;
+  const pergunta = atual
+    ? `Trocar ${atual.plano.nome} por ${plano.nome} (${moeda(plano.valorMensal)} por mês)?\n`
+      + 'A assinatura atual é encerrada hoje e a nova começa em seguida.'
+    : `Assinar ${plano.nome} por ${moeda(plano.valorMensal)} por mês?`;
+  if (!confirm(pergunta)) return;
+
+  const caminho = `/alunos/${aluno.cpf}/assinatura`;
+  executar(async () => {
+    let nova;
+    try {
+      nova = await api(caminho, 'POST', { planoId, confirmaPerdaDeDependentes: false });
+    } catch (e) {
+      if (e.status !== 409 || !e.corpo?.dependentes) throw e;
+      if (!confirm(`${e.message}\n\nTrocar mesmo assim?`)) {
+        avisar('Troca cancelada. Seu plano continua o mesmo.');
+        return;
+      }
+      nova = await api(caminho, 'POST', { planoId, confirmaPerdaDeDependentes: true });
+    }
+    avisar(`Assinatura ativa: ${nova.plano.nome}, desde ${dataLegivel(nova.dataInicio)}.`);
+  });
+}
+
+/** Extensão 4b: alerta sobre os dependentes antes de cancelar. */
+function cancelarAssinatura(aluno) {
+  const deps = meuPlano.assinatura?.dependentes ?? [];
+  const alerta = deps.length
+    ? `Os dependentes ${deps.join(', ')} também perderão o acesso.\n\n`
+    : '';
+  if (!confirm(`${alerta}Cancelar a sua assinatura?`)) return;
+  executar(() => api(`/alunos/${aluno.cpf}/assinatura`, 'DELETE'), 'Assinatura cancelada.');
+}
+
+/* ---------- UC02: buscar estabelecimentos ---------- */
+
+const distancia = m => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
+const tipoLegivel = t => t === 'Estudio' ? 'Estúdio' : t;
+
+/** Passo 3b: modalidades cadastradas na rede credenciada, sem repetir nomes. */
+function preencherModalidades() {
+  const el = $('#busca-modalidade');
+  const atual = el.value;
+  const nomes = [...new Map(credenciados()
+    .flatMap(e => e.modalidades.map(m => [m.nome.toLowerCase(), m.nome]))).values()]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  el.innerHTML = '<option value="">Todas</option>'
+    + nomes.map(n => `<option${n === atual ? ' selected' : ''}>${n}</option>`).join('');
+}
+
+/* coordenadas que o dispositivo pôs nos campos; se o aluno editar, passam a ser digitadas */
+let doDispositivo = null;
+
+/** Passo 2 e extensão 2a: sem coordenadas digitadas, pede a localização ao dispositivo. */
+function obterReferencia() {
+  const lat = $('#busca-lat').value, lng = $('#busca-lng').value;
+  if (lat !== '' && lng !== '') {
+    const origem = doDispositivo === `${lat},${lng}` ? 'dispositivo' : 'digitada';
+    return Promise.resolve({ latitude: parseFloat(lat), longitude: parseFloat(lng), origem });
+  }
+  return new Promise((ok, falha) => {
+    const semLocalizacao = () => falha(new Error(
+      'Não foi possível usar a localização do dispositivo. Digite a latitude e a longitude de referência.'));
+    if (!navigator.geolocation) return semLocalizacao();
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        $('#busca-lat').value = pos.coords.latitude.toFixed(6);
+        $('#busca-lng').value = pos.coords.longitude.toFixed(6);
+        doDispositivo = `${$('#busca-lat').value},${$('#busca-lng').value}`;
+        ok({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, origem: 'dispositivo' });
+      },
+      semLocalizacao,
+      { enableHighAccuracy: true, timeout: 10000 });
+  });
+}
+
+/** Passo 3: lê os filtros da tela. Dia e horário viram a faixa [inicio, fim). */
+function lerFiltros(referencia) {
+  const dia = $('#busca-dia').value, de = $('#busca-de').value, ate = $('#busca-ate').value;
+  if (!dia && (de || ate)) throw new Error('Escolha o dia para filtrar por horário.');
+  return {
+    ...referencia,
+    raioKm: parseFloat($('#busca-raio').value),
+    modalidade: $('#busca-modalidade').value,
+    tipo: $('#busca-tipo').value,
+    inicio: dia ? `${dia}T${de || '00:00'}` : '',
+    fim: dia ? `${dia}T${ate || '23:59'}` : '',
+    somenteCobertos: $('#busca-cobertos').checked
+  };
+}
+
+function consulta(cpf, filtros, chaves) {
+  const q = new URLSearchParams({ cpf });
+  chaves.forEach(k => { if (filtros[k] !== '' && filtros[k] != null) q.set(k, filtros[k]); });
+  return q.toString();
+}
+
+/** Passos 4 a 6. Também é o retorno ao passo 4 quando o aluno altera os filtros (6a). */
+async function buscar(aluno, filtros) {
+  busca = { cpf: aluno.cpf, filtros, resultados: null, erro: null, detalhe: null };
+  try {
+    busca.resultados = await api('/busca/estabelecimentos?' + consulta(aluno.cpf, filtros,
+      ['latitude', 'longitude', 'raioKm', 'modalidade', 'tipo', 'inicio', 'fim', 'somenteCobertos']));
+  } catch (e) {
+    busca.erro = e.message;
+  }
+  renderBusca(aluno);
+}
+
+/** Passo 7. Extensão 7a: se o estabelecimento saiu da rede, avisa e refaz a lista. */
+async function abrirDetalhe(aluno, cnpj) {
+  try {
+    busca.detalhe = await api(`/busca/estabelecimentos/${cnpj}?` + consulta(aluno.cpf, busca.filtros,
+      ['latitude', 'longitude', 'inicio', 'fim']));
+    renderBusca(aluno);
+  } catch (e) {
+    avisar(e.message, 'erro');
+    await buscar(aluno, busca.filtros);
+  }
+}
+
+function renderBusca(aluno) {
+  preencherModalidades();
+  const alvo = $('#resultado-busca');
+  if (busca.cpf !== aluno.cpf) {           // outro aluno, outro plano: a busca anterior não vale
+    busca = { cpf: aluno.cpf, filtros: null, resultados: null, erro: null, detalhe: null };
+  }
+  const f = busca.filtros;
+  $('#cont-busca').textContent = busca.resultados ? `${busca.resultados.length} encontrados` : '';
+  if (f) {
+    $('#busca-referencia').textContent = `${f.origem === 'dispositivo' ? 'Localização do dispositivo' : 'Coordenadas digitadas'}: `
+      + `${f.latitude.toFixed(4)}, ${f.longitude.toFixed(4)}`;
+  }
+
+  if (!f) { alvo.innerHTML = ''; return; }
+  if (busca.erro) { alvo.innerHTML = `<p class="vazio">${busca.erro}</p>`; return; }
+  if (busca.detalhe) { alvo.innerHTML = htmlDetalhe(aluno, busca.detalhe, f); return; }
+
+  const lista = busca.resultados;
+  if (!lista.length) {
+    /* extensão 4a */
+    alvo.innerHTML = `<div class="busca-vazia">
+        <p class="vazio">Nenhum estabelecimento credenciado atende aos filtros num raio de
+          ${String(f.raioKm).replace('.', ',')} km.${f.somenteCobertos ? ' Experimente incluir os não cobertos pelo seu plano.' : ''}</p>
+        <button class="acao discreta" data-ampliar-raio>Ampliar para ${String(f.raioKm * 2).replace('.', ',')} km</button>
+      </div>`;
+    return;
+  }
+
+  /* extensão 5a: nenhum coberto, diz qual nível liberaria o mais acessível */
+  let aviso5a = '';
+  if (lista.every(r => !r.coberto)) {
+    const menor = Math.min(...lista.map(r => r.nivelMinimo));
+    const liberados = lista.filter(r => r.nivelMinimo === menor).map(r => r.nome).join(', ');
+    aviso5a = `<p class="item-detalhe alerta">Nenhum destes é coberto pelo seu plano.
+      Um plano de nível ${menor} liberaria ${liberados}.</p>`;
+  }
+
+  alvo.innerHTML = aviso5a + '<div class="lista">' + lista.map(r => `<div class="item">
+      <div class="item-corpo">
+        <div class="item-nome">${r.nome}</div>
+        <div class="item-detalhe">${tipoLegivel(r.tipo)} · ${distancia(r.distanciaMetros)}${
+          r.modalidades.length ? ' · ' + r.modalidades.join(', ') : ''}</div>
+      </div>
+      ${r.coberto ? selo('Coberto', 'aprovado') : selo(`Exige nível ${r.nivelMinimo}`, 'pendente')}
+      <button class="acao discreta" data-detalhe="${r.cnpj}">Detalhes</button>
+    </div>`).join('') + '</div>';
+}
+
+/** Passo 7: 7a nome e tipo, 7b endereço e distância, 7c modalidades, 7d cobertura, 7e grade. */
+function htmlDetalhe(aluno, d, f) {
+  const e = d.estabelecimento;
+  const cobertura = e.coberto
+    ? selo('Coberto pelo seu plano', 'aprovado')
+    : `${selo('Não coberto', 'pendente')}
+       <div class="item-detalhe alerta">Exige um plano de nível ${e.nivelMinimo}; o seu é nível ${d.nivelDoPlano}.</div>`;
+  const periodo = f.inicio
+    ? `Grade de ${dataLegivel(f.inicio.slice(0, 10))}, das ${f.inicio.slice(11)} às ${f.fim.slice(11)}`
+    : 'Grade dos próximos 7 dias';
+  const jaReservou = a => estado.reservas.some(r =>
+    r.alunoCpf === aluno.cpf && r.aulaId === a.id && r.situacao === 'CONFIRMADA');
+
+  const grade = d.aulas.length
+    ? '<div class="aulas">' + d.aulas.map(a => `<article class="aula">
+        <div class="aula-quando">${a.inicioLegivel}</div>
+        <div class="aula-modalidade">${a.modalidade}, com ${a.instrutor} · ${a.duracaoMin} min</div>
+        <div class="vagas" aria-hidden="true">${barraDeVagas(a)}</div>
+        <div class="vagas-nota">${a.vagasDisponiveis} de ${a.capacidade} vagas livres</div>
+        ${e.coberto ? `<div class="aula-acoes">${jaReservou(a)
+          ? selo('Você tem vaga nesta aula', 'aprovado')
+          : `<button class="acao discreta" data-reservar="${a.id}">Reservar vaga</button>`}</div>` : ''}
+      </article>`).join('') + '</div>'
+    : '<p class="vazio">Nenhuma aula no período.</p>';
+
+  return `<div class="detalhe-estabelecimento">
+      <button class="acao discreta" data-voltar-lista>← Voltar à lista</button>
+      <div class="detalhe-cabeca">
+        <div class="item-nome">${e.nome}</div>
+        <div class="item-detalhe">${tipoLegivel(e.tipo)}</div>
+      </div>
+      <div class="item-detalhe">${e.endereco}</div>
+      <div class="item-detalhe">A ${distancia(e.distanciaMetros)} da referência</div>
+      <div class="item-detalhe">Modalidades: ${e.modalidades.length ? e.modalidades.join(', ') : 'nenhuma cadastrada'}</div>
+      <div class="detalhe-cobertura">${cobertura}</div>
+      <p class="lista-titulo">${periodo}</p>
+      ${grade}
+    </div>`;
+}
 
 const rotuloCheckIn = {
   PENDENTE: ['Aguardando validação', 'pendente'],
@@ -777,6 +1081,33 @@ $('#loc-navegador').addEventListener('click', () => {
     { enableHighAccuracy: true, timeout: 10000 });
 });
 
+/* --- UC02 --- */
+
+$('#form-busca').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const aluno = alunoAtual();
+  if (!aluno) return;
+  try {
+    buscar(aluno, lerFiltros(await obterReferencia()));
+  } catch (e) {
+    avisar(e.message, 'erro');   // 2a: sem localização, pede as coordenadas
+    $('#busca-lat').focus();
+  }
+});
+
+/* Passo 2: pede a localização ao dispositivo, mesmo que já haja coordenadas digitadas. */
+$('#busca-localizar').addEventListener('click', async () => {
+  $('#busca-lat').value = '';
+  $('#busca-lng').value = '';
+  try {
+    await obterReferencia();
+    avisar('Localização do dispositivo obtida.');
+  } catch (e) {
+    avisar(e.message, 'erro');
+    $('#busca-lat').focus();
+  }
+});
+
 $('#form-checkin').addEventListener('submit', ev => {
   ev.preventDefault();
   const aluno = alunoAtual();
@@ -794,8 +1125,22 @@ $('#form-checkin').addEventListener('submit', ev => {
 });
 
 $('#vista-aluno').addEventListener('click', ev => {
-  const { reservar, cancelarReserva } = ev.target.dataset;
+  const { reservar, cancelarReserva, assinarPlano: planoId, cancelarAssinatura: cancelar } =
+    ev.target.dataset;
   const aluno = alunoAtual();
+
+  if (planoId !== undefined) assinarPlano(aluno, parseInt(planoId));
+  if (cancelar !== undefined) cancelarAssinatura(aluno);
+
+  /* UC02 */
+  const { detalhe, voltarLista, ampliarRaio } = ev.target.dataset;
+  if (detalhe !== undefined) abrirDetalhe(aluno, detalhe);
+  if (voltarLista !== undefined) { busca.detalhe = null; renderBusca(aluno); }
+  if (ampliarRaio !== undefined) {
+    const raio = busca.filtros.raioKm * 2;
+    $('#busca-raio').value = raio;
+    buscar(aluno, { ...busca.filtros, raioKm: raio });
+  }
 
   if (reservar !== undefined) {
     const aula = estado.aulas.find(a => a.id === parseInt(reservar));

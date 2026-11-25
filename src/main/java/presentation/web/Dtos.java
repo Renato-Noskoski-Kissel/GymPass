@@ -40,6 +40,25 @@ public class Dtos {
                            int limiteAulasMes, boolean permiteDependentes,
                            List<String> cobertura) {}
 
+    /** UC01 passo 7 - resumo da assinatura. dependentes: os que seguem cobertos. */
+    public record AssinaturaDto(int id, PlanoDto plano, String dataInicio, String situacao,
+                                List<String> dependentes) {}
+
+    /**
+     * UC02 passo 6 - um item da lista. nivelMinimo é o nível de plano que libera
+     * o estabelecimento (extensão 5a, quando coberto = false).
+     */
+    public record ResultadoBuscaDto(String cnpj, String nome, String tipo, String endereco,
+                                    double distanciaMetros, boolean coberto, int nivelMinimo,
+                                    List<String> modalidades) {}
+
+    /**
+     * UC02 passo 7 - os dados do item da lista (7a a 7d), o nível do plano do
+     * aluno para comparar com o exigido, e a grade do período (7e).
+     */
+    public record DetalheEstabelecimentoDto(ResultadoBuscaDto estabelecimento, int nivelDoPlano,
+                                            List<AulaDto> aulas) {}
+
     public record AulaDto(int id, String inicio, String inicioLegivel, long duracaoMin,
                           int capacidade, int vagasDisponiveis, String modalidade,
                           String instrutor, boolean cancelada, boolean jaComecou,
@@ -72,4 +91,7 @@ public class Dtos {
                             List<ReservaDto> reservas) {}
 
     public record Erro(String mensagem) {}
+
+    /** UC01 5a - a operação só segue se o aluno confirmar a perda destes dependentes. */
+    public record ConfirmacaoNecessaria(String mensagem, List<String> dependentes) {}
 }

@@ -82,6 +82,23 @@ public class Adesao {
      * no domínio que registre um funcionário no quadro sem uma adesão a um plano.
      */
     public static Adesao cadastrarBeneficiario(Funcionario funcionario, Plano plano) {
+        validarConcessao(funcionario, plano);
+        funcionario.getEmpresaVinculada().incluirFuncionario(funcionario);
+        return new Adesao(funcionario, plano);
+    }
+
+    /**
+     * UC01 - o funcionário que já está no quadro, mas sem adesão vigente
+     * (cancelou), assina um plano de novo. Garantir que não exista outra
+     * adesão vigente é papel de quem chama, que consulta o repositório.
+     */
+    public static Adesao assinar(Funcionario funcionario, Plano plano) {
+        validarConcessao(funcionario, plano);
+        return new Adesao(funcionario, plano);
+    }
+
+    /** RN1 - elegível e com um plano que a própria empresa oferece. */
+    private static void validarConcessao(Funcionario funcionario, Plano plano) {
         if (!funcionario.ehElegivel()) {
             throw new RegraDeNegocioException(
                 "Funcionário não elegível para receber o benefício (RN1): " + funcionario);
@@ -91,8 +108,6 @@ public class Adesao {
             throw new RegraDeNegocioException(
                 "A empresa " + empresa + " não oferece o plano " + plano.getNome());
         }
-        empresa.incluirFuncionario(funcionario);
-        return new Adesao(funcionario, plano);
     }
 
     /**

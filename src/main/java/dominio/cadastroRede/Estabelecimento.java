@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -158,6 +159,19 @@ public abstract class Estabelecimento {
         Aula aula = new Aula(inicio, duracao, capacidade, this, modalidade, instrutor);
         aulas.add(aula);
         return aula;
+    }
+
+    /**
+     * UC02 - grade do período: aulas não canceladas que começam em
+     * [inicio, fim), em ordem de horário.
+     */
+    public List<Aula> aulasEntre(LocalDateTime inicio, LocalDateTime fim) {
+        return aulas.stream()
+                .filter(a -> !a.estaCancelada())
+                .filter(a -> !a.getDataHoraInicio().isBefore(inicio)
+                          && a.getDataHoraInicio().isBefore(fim))
+                .sorted(Comparator.comparing(Aula::getDataHoraInicio))
+                .toList();
     }
 
     public List<Modalidade> getModalidades() { return Collections.unmodifiableList(modalidades); }

@@ -2,6 +2,7 @@ package presentation.web;
 
 import application.NaoEncontradoException;
 import dominio.RegraDeNegocioException;
+import dominio.planosAdesao.DependentesPerdemAcessoException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,17 @@ public class TratadorDeErros {
     public ResponseEntity<Dtos.Erro> regraViolada(RegraDeNegocioException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new Dtos.Erro(e.getMessage()));
+    }
+
+    /**
+     * UC01 5a - não é um erro definitivo: a tela pergunta ao aluno e repete o
+     * pedido com a confirmação. 409 e a lista de nomes para montar a pergunta.
+     */
+    @ExceptionHandler(DependentesPerdemAcessoException.class)
+    public ResponseEntity<Dtos.ConfirmacaoNecessaria> confirmacaoNecessaria(
+            DependentesPerdemAcessoException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new Dtos.ConfirmacaoNecessaria(e.getMessage(), e.getDependentes()));
     }
 
     @ExceptionHandler(NaoEncontradoException.class)

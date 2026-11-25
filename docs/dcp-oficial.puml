@@ -20,11 +20,19 @@ class Controllers <<fachada>> {
   +suspender(cnpj : String) : void
   +contratarEmpresa(dados : NovaEmpresa) : void
   +criarPlano(dados : NovoPlano) : void
+  .. AssinaturaController ..
+  +planosDisponiveis(cpf : String) : List<PlanoDto>
+  +assinaturaVigente(cpf : String) : AssinaturaDto
+  +assinar(cpf : String, dados : NovaAssinatura) : AssinaturaDto
+  +cancelarAssinatura(cpf : String) : void
   .. AulaController ..
   +agendar(dados : NovaAula) : void
   +trocarInstrutor(id : int, dados : TrocaDeInstrutor) : void
   +alterarCapacidade(id : int, dados : NovaCapacidade) : void
   +cancelar(id : int) : void
+  .. BuscaController ..
+  +buscar(cpf : String, latitude : double, longitude : double, raioKm : double, modalidade : String, tipo : String, inicio : String, fim : String, somenteCobertos : boolean) : List<ResultadoBuscaDto>
+  +detalhar(cnpj : String, cpf : String, latitude : double, longitude : double, inicio : String, fim : String) : DetalheEstabelecimentoDto
   .. CheckInController ..
   +realizarCheckIn(dados : NovoCheckIn) : void
   .. EmpresaController ..
@@ -61,6 +69,9 @@ class Services <<fachada>> {
   +cancelar(aulaId : int) : void
   +reservarVaga(cpf : String, aulaId : int) : Reserva
   +cancelarReserva(cpf : String, reservaId : int, aceitaPenalidade : boolean) : void
+  .. busca (BuscaService) ..
+  +buscarEstabelecimentos(cpf : String, latitude : double, longitude : double, raioKm : double, modalidade : String, tipo : String, inicio : String, fim : String, somenteCobertos : boolean) : List<Estabelecimento>
+  +detalharEstabelecimento(cpf : String, cnpj : String) : Estabelecimento
   .. controleDeAcesso (CheckInService) ..
   +realizarCheckIn(cpf : String, cnpj : String, latitude : double, longitude : double) : CheckIn
   +localizarNaRecepcao(cnpj : String, codigo : String) : CheckIn
@@ -84,6 +95,11 @@ class Services <<fachada>> {
   +removerFuncionario(cnpjEmpresa : String, cpf : String) : void
   +suspenderAdesao(cnpjEmpresa : String, cpf : String) : void
   +reativarAdesao(cnpjEmpresa : String, cpf : String) : void
+  .. plano (AssinaturaService) ..
+  +planosDisponiveis(cpf : String) : List<Plano>
+  +assinaturaVigente(cpf : String) : Adesao
+  +assinar(cpf : String, planoId : int, confirmaPerdaDeDependentes : boolean) : Adesao
+  +cancelarAssinatura(cpf : String) : void
   .. auxiliares ..
   -adesaoVigente(aluno : Aluno) : Adesao
   -adesaoVigente(cnpjEmpresa : String, cpf : String) : Adesao
@@ -183,6 +199,7 @@ package "Planos e Adesão" {
     -dataFim : LocalDate
     -estado : EstadoAdesao
     {static} +cadastrarBeneficiario(f : Funcionario, p : Plano) : Adesao
+    {static} +assinar(f : Funcionario, p : Plano) : Adesao
     {static} +trocarPlano(atual : Adesao, novo : Plano) : Adesao
     +incluirDependente(d : Dependente) : Adesao
     +registrarCheckIn(e : Estabelecimento, lat : double, lng : double, ultimo : CheckIn) : CheckIn
@@ -320,6 +337,7 @@ package "Cadastro e Rede" {
     +desligarInstrutor(i : Instrutor) : void
     +getInstrutores() : List<Instrutor>
     +agendarAula(inicio : LocalDateTime, duracao : Duration, capacidade : int, m : Modalidade, i : Instrutor) : Aula
+    +aulasEntre(inicio : LocalDateTime, fim : LocalDateTime) : List<Aula>
     +getNivelMinimo() : int
     +getEndereco() : Endereco
   }
